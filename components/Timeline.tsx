@@ -92,17 +92,17 @@ const ShowCompletedToggle: React.FC<{ checked: boolean; onChange: (checked: bool
     </div>
 );
 
-// FIX: Moved AgendaItem type outside the component to use it for type casting.
-type AgendaItem = {
-    type: 'task' | 'test';
-    data: Task | TestPlan;
-    date: Date;
-};
 
 const Timeline: React.FC = () => {
     const [tasks] = useLocalStorage<Task[]>('tasks', []);
     const [testPlans] = useLocalStorage<TestPlan[]>('testPlans', []);
     const [showCompleted, setShowCompleted] = useState(false);
+
+    type AgendaItem = {
+        type: 'task' | 'test';
+        data: Task | TestPlan;
+        date: Date;
+    };
 
     const { overdueItems, todayItems, upcomingGrouped, completedTodayTasks } = useMemo(() => {
         const today = new Date();
@@ -225,7 +225,7 @@ const Timeline: React.FC = () => {
                         <div>
                             <h2 className="text-lg font-bold text-yellow-400 sticky top-20 backdrop-blur-sm py-2 z-10">Upcoming (Next 7 Days)</h2>
                              <div className="space-y-4 mt-2">
-                                {/* FIX: Cast the result of Object.entries to a typed array to resolve 'unknown' type for the 'items' variable. */}
+                                {/* FIX: Cast the result of Object.entries to a typed array to resolve 'unknown' type errors. */}
                                 {(Object.entries(upcomingGrouped) as [string, AgendaItem[]][]).map(([date, items]) => (
                                     <div key={date}>
                                         <h3 className="font-semibold text-gray-300">{formatDateHeader(date)}</h3>

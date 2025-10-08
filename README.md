@@ -4,6 +4,38 @@ This is a futuristic, web-based planner designed to help students organize, trac
 
 ---
 
+## Progressive Web App (PWA) Support & APK Conversion
+
+This application is now a fully-featured Progressive Web App (PWA), which means:
+
+*   **Offline Functionality:** You can use the planner even without an internet connection after your first visit.
+*   **Installable:** You can "install" the app to your home screen on mobile devices or as a desktop app on computers for a native-app-like experience.
+*   **APK Conversion:** The PWA can be easily converted into an Android APK file using tools like [PWA Builder](https://www.pwabuilder.com/) or a command-line utility.
+
+### Before You Begin: Add App Icons
+
+To make the PWA work correctly, you need to add a few icon files to the root directory of this project. Create these three files with your own icon design:
+
+*   `icon-192.png` (a 192x192 pixel PNG image)
+*   `icon-512.png` (a 512x512 pixel PNG image)
+*   `maskable-icon.png` (a 512x512 pixel PNG image, designed to be "maskable" for adaptive icons on Android. You can use a tool like [Maskable.app](https://maskable.app/editor) to create this).
+
+### How to Install the PWA
+
+*   **On Desktop (Chrome/Edge):** Visit the website, and an "Install" icon (usually a computer with a down arrow) will appear in the address bar. Click it to install the app.
+*   **On Mobile (Android/iOS):** Visit the website in your browser.
+    *   **Android (Chrome):** Tap the three-dot menu and select "Install app" or "Add to Home screen".
+    *   **iOS (Safari):** Tap the "Share" button and select "Add to Home Screen".
+
+### How to Convert to an APK
+
+1.  Deploy the website to a live URL (e.g., using the GitHub Pages instructions below).
+2.  Go to a service like [PWA Builder](https://www.pwabuilder.com/).
+3.  Enter the URL of your deployed application.
+4.  Follow the on-screen instructions to package your PWA as an APK for Android. You can then download the APK file and install it on an Android device.
+
+---
+
 ## How to Deploy to GitHub Pages (A Step-by-Step Guide)
 
 This application is built as a static website, which means it can be hosted for free and easily using GitHub Pages. The repository is already set up for **automatic deployment**. Just follow these steps precisely, and your planner will be live.
@@ -44,34 +76,6 @@ That's it for configuration! The repository is now ready to be deployed by the w
 > **Note:** It can sometimes take a few minutes for the site to become available after the first successful deployment.
 
 ---
-
-## Mobile & Offline Use (Progressive Web App)
-
-NEET Synapse is built as a Progressive Web App (PWA), which means you can "install" it on your phone for a native app-like experience, including offline access.
-
-### How to Install
-
-**On Android (using Chrome):**
-1.  Open the NEET Synapse website in your Chrome browser.
-2.  Tap the three-dot menu icon in the top-right corner.
-3.  Tap **"Install app"** or **"Add to Home screen"**.
-4.  Follow the on-screen prompts. The app will now appear on your home screen.
-
-**On iOS (using Safari):**
-1.  Open the NEET Synapse website in your Safari browser.
-2.  Tap the "Share" icon (a square with an arrow pointing up) in the bottom navigation bar.
-3.  Scroll down and tap **"Add to Home Screen"**.
-4.  Confirm by tapping "Add". The app will now appear on your home screen.
-
-### PWA Icons
-For the "Add to Home Screen" feature to display a proper icon, you'll need to add two icon files to the root directory of this project:
-- `icon-192.png` (192x192 pixels)
-- `icon-512.png` (512x512 pixels)
-
-These are referenced in the `manifest.json` file.
-
-### Note on APKs
-While a PWA provides a fantastic, installable, offline-first experience directly from the web, it does not generate an `.apk` file for the Google Play Store. To do that, one would typically use a tool like **Capacitor** or **Cordova** to wrap this web application into a native Android project. That process is beyond the scope of this project's current setup.
 
 ### Troubleshooting Common Issues
 

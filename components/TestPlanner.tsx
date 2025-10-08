@@ -103,7 +103,7 @@ const CreateTestModal: React.FC<{ isOpen: boolean; onClose: () => void; onAddTes
                 </div>
                 
                 <h3 className="font-semibold text-brand-cyan-400 mb-2">Select Syllabus</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-h-60 overflow-y-auto p-2 bg-black/20 rounded-md">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-60 overflow-y-auto p-2 bg-black/20 rounded-md">
                     {(Object.keys(syllabus) as SubjectName[]).map(subject => (
                         <div key={subject}>
                             <h4 className="font-bold mb-2">{subject}</h4>
@@ -519,39 +519,24 @@ const TestPlanner: React.FC = () => {
                                         
                                         <div>
                                             <h4 className="font-semibold text-brand-cyan-500 mb-2">Test Preparation Checklist</h4>
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-xs">
-                                                    <thead className="sticky top-0 bg-slate-900/70 backdrop-blur-sm z-20">
-                                                        <tr className="text-left text-gray-400 border-b border-white/20">
-                                                            <th className="py-2 px-3 w-2/5">Topic</th>
-                                                            <th className="py-2 px-3 text-center w-1/5">Daily Performance</th>
-                                                            <th className="py-2 px-3 text-center w-1/5">Test Revision</th>
-                                                            <th className="py-2 px-3 text-center w-1/5">Test Practice</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                    {(() => {
-                                                        const groupedTopics = test.topicStatus.reduce((acc, topic) => {
-                                                            if (!acc[topic.subject]) acc[topic.subject] = {};
-                                                            if (!acc[topic.subject][topic.chapter]) acc[topic.subject][topic.chapter] = [];
-                                                            acc[topic.subject][topic.chapter].push(topic);
-                                                            return acc;
-                                                        }, {} as Record<SubjectName, Record<string, TopicStatus[]>>);
+                                            <div className="space-y-4">
+                                                {(() => {
+                                                    const groupedTopics = test.topicStatus.reduce((acc, topic) => {
+                                                        if (!acc[topic.subject]) acc[topic.subject] = {};
+                                                        if (!acc[topic.subject][topic.chapter]) acc[topic.subject][topic.chapter] = [];
+                                                        acc[topic.subject][topic.chapter].push(topic);
+                                                        return acc;
+                                                    }, {} as Record<SubjectName, Record<string, TopicStatus[]>>);
 
-                                                        return (Object.keys(groupedTopics) as SubjectName[]).map(subject => (
-                                                            <React.Fragment key={subject}>
-                                                                <tr className="bg-brand-cyan-900/50 backdrop-blur-sm sticky top-9 z-10">
-                                                                    <th colSpan={4} className="py-2 px-3 text-left font-bold text-brand-cyan-400 text-sm uppercase tracking-wider">
-                                                                        {subject}
-                                                                    </th>
-                                                                </tr>
-                                                                {Object.keys(groupedTopics[subject]).map(chapter => (
-                                                                    <React.Fragment key={chapter}>
-                                                                        <tr className="bg-black/40">
-                                                                            <td colSpan={4} className="py-1.5 px-3 font-semibold text-gray-300 pl-6">
-                                                                                {chapter}
-                                                                            </td>
-                                                                        </tr>
+                                                    return (Object.keys(groupedTopics) as SubjectName[]).map(subject => (
+                                                        <div key={subject}>
+                                                            <h5 className="font-bold text-brand-cyan-400 text-sm uppercase tracking-wider bg-brand-cyan-900/50 p-2 rounded-t-md sticky top-0 z-10">
+                                                                {subject}
+                                                            </h5>
+                                                            {Object.keys(groupedTopics[subject]).map(chapter => (
+                                                                <div key={chapter} className="mb-2">
+                                                                    <p className="font-semibold text-gray-300 bg-black/40 p-2 text-sm">{chapter}</p>
+                                                                    <div className="space-y-2 p-2">
                                                                         {groupedTopics[subject][chapter].map(topic => {
                                                                             const avgAccuracy = getAvgAccuracy(topic.practiceAttempts);
                                                                             const dailyStats = progressStats.subjects[topic.subject]
@@ -563,44 +548,51 @@ const TestPlanner: React.FC = () => {
                                                                                 : undefined;
 
                                                                             return (
-                                                                                <tr key={topic.microtopic} className="border-b border-white/10 hover:bg-white/5">
-                                                                                    <td className={cn("py-1.5 px-3 pl-8", dailyScore !== undefined && getScoreColorClass(dailyScore))}>{topic.microtopic}</td>
-                                                                                    <td className="py-1.5 text-center">
-                                                                                        {dailyScore !== undefined ? (
-                                                                                            <div className={getScoreColorClass(dailyScore)}>
-                                                                                                <span className="block font-semibold">Score: {dailyScore.toFixed(0)}</span>
+                                                                                <Card key={topic.microtopic} className="p-3 text-xs">
+                                                                                    <p className={cn("font-semibold mb-2", dailyScore !== undefined && getScoreColorClass(dailyScore))}>{topic.microtopic}</p>
+                                                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
+                                                                                        <div className="p-2 bg-slate-900/50 rounded-md">
+                                                                                            <p className="font-bold text-gray-400">Daily Perf.</p>
+                                                                                            {dailyScore !== undefined ? (
+                                                                                                <div className={cn("font-bold text-lg", getScoreColorClass(dailyScore))}>
+                                                                                                    {dailyScore.toFixed(0)}
+                                                                                                </div>
+                                                                                            ) : (
+                                                                                                <span className="text-gray-500">No Data</span>
+                                                                                            )}
+                                                                                        </div>
+                                                                                        <div className="p-2 bg-slate-900/50 rounded-md flex flex-col justify-between items-center">
+                                                                                             <p className="font-bold text-gray-400">Revision</p>
+                                                                                             {topic.revisionDifficulty ? (
+                                                                                                <span className="font-bold text-lg"> {topic.revisionDifficulty}/5</span>
+                                                                                            ) : (
+                                                                                                <Button variant="ghost" size="sm" className="mt-1" onClick={() => { setCurrentTestId(test.id); setTopicToUpdate(topic); setRevisionModalOpen(true); }}><BrainIcon className="w-4 h-4 mr-1"/>Revise</Button>
+                                                                                            )}
+                                                                                        </div>
+                                                                                         <div className="p-2 bg-slate-900/50 rounded-md flex flex-col justify-between items-center">
+                                                                                            <p className="font-bold text-gray-400">Practice</p>
+                                                                                            <div className="flex-grow flex flex-col justify-center">
+                                                                                                {avgAccuracy !== null && (
+                                                                                                    <span className={cn('font-bold block mb-1 text-lg', avgAccuracy >= 80 ? 'text-green-400' : avgAccuracy >= 50 ? 'text-yellow-400' : 'text-red-400')}>
+                                                                                                        {avgAccuracy?.toFixed(0) ?? 'N/A'}%
+                                                                                                    </span>
+                                                                                                )}
                                                                                             </div>
-                                                                                        ) : (
-                                                                                            <span className="text-gray-500">No Data</span>
-                                                                                        )}
-                                                                                    </td>
-                                                                                    <td className="py-1.5 text-center">
-                                                                                        {topic.revisionDifficulty ? (
-                                                                                            <span className="font-bold">Diff: {topic.revisionDifficulty}/5</span>
-                                                                                        ) : (
-                                                                                            <Button variant="ghost" size="sm" onClick={() => { setCurrentTestId(test.id); setTopicToUpdate(topic); setRevisionModalOpen(true); }}><BrainIcon className="w-4 h-4 mr-1"/>Revise</Button>
-                                                                                        )}
-                                                                                    </td>
-                                                                                    <td className="py-1.5 text-center">
-                                                                                        {avgAccuracy !== null && (
-                                                                                            <span className={cn('font-bold block mb-1', avgAccuracy >= 80 ? 'text-green-400' : avgAccuracy >= 50 ? 'text-yellow-400' : 'text-red-400')}>
-                                                                                                Acc: {avgAccuracy?.toFixed(0) ?? 'N/A'}%
-                                                                                            </span>
-                                                                                        )}
-                                                                                        <Button variant="ghost" size="sm" onClick={() => { setCurrentTestId(test.id); setTopicToUpdate(topic); setPracticeModalOpen(true); }}><ClipboardCheckIcon className="w-4 h-4 mr-1"/>Practice</Button>
-                                                                                    </td>
-                                                                                </tr>
+                                                                                            <Button variant="ghost" size="sm" className="mt-1" onClick={() => { setCurrentTestId(test.id); setTopicToUpdate(topic); setPracticeModalOpen(true); }}><ClipboardCheckIcon className="w-4 h-4 mr-1"/>Practice</Button>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </Card>
                                                                             );
                                                                         })}
-                                                                    </React.Fragment>
-                                                                ))}
-                                                            </React.Fragment>
-                                                        ));
-                                                    })()}
-                                                    </tbody>
-                                                </table>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ));
+                                                })()}
                                             </div>
                                         </div>
+
                                     </div>
                                 )}
                             </Card>
