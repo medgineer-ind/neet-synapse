@@ -1,4 +1,5 @@
 
+
 import React, { useMemo, useState } from 'react';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { Task, TestPlan, TaskType, Priority } from '../types';
@@ -91,6 +92,12 @@ const ShowCompletedToggle: React.FC<{ checked: boolean; onChange: (checked: bool
     </div>
 );
 
+// FIX: Moved AgendaItem type outside the component to use it for type casting.
+type AgendaItem = {
+    type: 'task' | 'test';
+    data: Task | TestPlan;
+    date: Date;
+};
 
 const Timeline: React.FC = () => {
     const [tasks] = useLocalStorage<Task[]>('tasks', []);
@@ -109,12 +116,6 @@ const Timeline: React.FC = () => {
             ...testPlans.filter(test => test.status === 'Upcoming'),
         ];
         
-        type AgendaItem = {
-            type: 'task' | 'test';
-            data: Task | TestPlan;
-            date: Date;
-        };
-
         const items: AgendaItem[] = allPendingItems.map(item => {
             const itemDate = new Date(new Date(item.date).toLocaleString("en-US", { timeZone: "UTC" }));
             itemDate.setHours(0, 0, 0, 0);
@@ -150,12 +151,9 @@ const Timeline: React.FC = () => {
         todayItems.sort(sortFn);
         upcomingItems.sort(sortFn);
 
-        // FIX: The 'reduce' method was not correctly typed, causing `upcomingGrouped` to have values of type 'unknown'. By explicitly typing the accumulator and the initial value, we ensure `upcomingGrouped` has the correct type `Record<string, AgendaItem[]>`, which resolves the error when calling `.map` on its values.
-        const upcomingGrouped = upcomingItems.reduce((acc: Record<string, AgendaItem[]>, item) => {
+        const upcomingGrouped = upcomingItems.reduce((acc, item) => {
             const dateStr = item.date.toDateString();
-            if (!acc[dateStr]) {
-                acc[dateStr] = [];
-            }
+            if (!acc[dateStr]) acc[dateStr] = [];
             acc[dateStr].push(item);
             return acc;
         }, {} as Record<string, AgendaItem[]>);
@@ -227,7 +225,8 @@ const Timeline: React.FC = () => {
                         <div>
                             <h2 className="text-lg font-bold text-yellow-400 sticky top-20 backdrop-blur-sm py-2 z-10">Upcoming (Next 7 Days)</h2>
                              <div className="space-y-4 mt-2">
-                                {Object.entries(upcomingGrouped).map(([date, items]) => (
+                                {/* FIX: Cast the result of Object.entries to a typed array to resolve 'unknown' type for the 'items' variable. */}
+                                {(Object.entries(upcomingGrouped) as [string, AgendaItem[]][]).map(([date, items]) => (
                                     <div key={date}>
                                         <h3 className="font-semibold text-gray-300">{formatDateHeader(date)}</h3>
                                         <div className="space-y-2 mt-1 pl-4 border-l-2 border-white/10">

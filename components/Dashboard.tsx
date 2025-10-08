@@ -1,8 +1,8 @@
 
 
-
 import React, { useMemo, useState, useEffect } from 'react';
 import useLocalStorage from '../hooks/useLocalStorage';
+// FIX: Import ChapterStats and MicrotopicStats to use them for type casting.
 import { Task, ProgressStats, SubjectName, SubjectStats, AnalyzedTopic, TaskType, TestPlan, ChapterStats, MicrotopicStats } from '../types';
 import { calculateProgress, analyzeTopicsForSubject } from '../lib/utils';
 import { cn } from '../lib/utils';
@@ -322,6 +322,7 @@ const DetailedStatsTable: React.FC<{
                         </tr>
                     </thead>
                     <tbody>
+                        {/* FIX: Cast the result of Object.entries to a typed array to resolve 'unknown' type errors on destructured variables. */}
                         {(Object.entries(subjectStats.chapters) as [string, ChapterStats][]).filter(([,data]) => hasData(data)).map(([chapterName, chapterData]) => {
                             const chapterMicrotopicScores = Object.values(chapterData.microtopics)
                                 .filter(mt => mt.completed > 0 && (mt.avgDifficulty > 0 || mt.avgAccuracy !== null))
@@ -344,6 +345,7 @@ const DetailedStatsTable: React.FC<{
                                         <td className="p-3 text-center">{chapterData.avgDifficulty > 0 ? chapterData.avgDifficulty.toFixed(2) : 'N/A'}</td>
                                         <td className="p-3 text-center">{chapterData.avgAccuracy !== null ? `${chapterData.avgAccuracy.toFixed(1)}%` : 'N/A'}</td>
                                     </tr>
+                                    {/* FIX: Cast the result of Object.entries to a typed array to resolve 'unknown' type errors on destructured variables. */}
                                     {expanded[chapterName] && (Object.entries(chapterData.microtopics) as [string, MicrotopicStats][]).filter(([,data]) => hasData(data)).map(([microtopicName, microtopicData]) => {
                                         const microtopicScore = calculateOverallScore(microtopicData.avgDifficulty, microtopicData.avgAccuracy);
                                         return (
