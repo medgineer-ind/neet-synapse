@@ -1,0 +1,25 @@
+{
+  "name": "NEET Synapse",
+  "short_name": "NEETSynapse",
+  "description": "A futuristic, AI poweredand free to use planner to help students organize, track, and analyze their NEET preparation. It features task planning, progress dashboards, and operates fully offline using localStorage.",
+  "start_url": "https://neetsynapse.vercel.app/",
+  "display": "standalone",
+  "background_color": "#0A192F",
+  "theme_color": "#00EFFF",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "id": "NEETsynapse",
+  "dir": "auto",
+  "lang": "en"
+}
