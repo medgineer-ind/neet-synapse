@@ -4,7 +4,7 @@
   "display": "standalone",
   "name": "neetsynapse.vercel",
   "orientation": "any",
-  "scope": "https://neetsynapse.vercel.app/",
+  "scope": "/",
   "short_name": "neetsynapse.vercel",
   "start_url": "https://neetsynapse.vercel.app/",
   "theme_color": "#0A192F",
