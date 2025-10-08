@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Task, TaskType, SubjectName, TestPlan, Priority, TaskStatus } from '../types';
@@ -413,7 +414,7 @@ const TaskItem: React.FC<{ task: Task; onUpdateTask: (task: Task) => void; onDel
                     <div className="flex items-center gap-3">
                         <TaskTypeTag type={task.taskType} />
                         <p className="text-xs text-gray-400 truncate" title={task.microtopics.join(', ')}>
-                           {task.microtopics.join(', ')} ({task.subject} &gt {task.chapter})
+                           {task.microtopics.join(', ')} ({task.subject} > {task.chapter})
                         </p>
                     </div>
                 </div>
@@ -780,9 +781,22 @@ const FilterModal: React.FC<{
         }
     }, [isOpen, filters]);
 
+    // FIX: Replaced unsafe `handleChange` with a type-safe version using a switch statement to prevent type widening and ensure the state object conforms to `FilterState`.
     const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const { name, value } = e.target;
-        setLocalFilters(prev => ({ ...prev, [name]: value as any }));
+        switch (name) {
+            case 'subject':
+                setLocalFilters(prev => ({ ...prev, subject: value as SubjectName | 'All' }));
+                break;
+            case 'type':
+                setLocalFilters(prev => ({ ...prev, type: value as TaskType | 'All' }));
+                break;
+            case 'priority':
+                setLocalFilters(prev => ({ ...prev, priority: value as Priority | 'All' }));
+                break;
+            default:
+                break;
+        }
     };
 
     const handleApply = () => {
