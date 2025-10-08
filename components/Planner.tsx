@@ -414,7 +414,7 @@ const TaskItem: React.FC<{ task: Task; onUpdateTask: (task: Task) => void; onDel
                     <div className="flex items-center gap-3">
                         <TaskTypeTag type={task.taskType} />
                         <p className="text-xs text-gray-400 truncate" title={task.microtopics.join(', ')}>
-                           {task.microtopics.join(', ')} ({task.subject} > {task.chapter})
+                           {task.microtopics.join(', ')} ({task.subject} &gt {task.chapter})
                         </p>
                     </div>
                 </div>
