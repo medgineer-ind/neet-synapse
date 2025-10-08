@@ -300,70 +300,70 @@ const DetailedStatsTable: React.FC<{
     }
     
     const getScoreBgClass = (score: number) => {
-        if (score <= 40) return 'bg-red-500/10';
-        if (score <= 79) return 'bg-yellow-500/10';
-        return 'bg-green-500/10';
+        if (score <= 40) return 'bg-red-500/10 hover:bg-red-500/20';
+        if (score <= 79) return 'bg-yellow-500/10 hover:bg-yellow-500/20';
+        return 'bg-green-500/10 hover:bg-green-500/20';
     }
 
 
     return (
         <Card>
             <h3 className="text-lg font-semibold text-brand-cyan-400 mb-4">Detailed Chapter Breakdown</h3>
-            <div className="space-y-3">
-                 {/* FIX: Cast the result of Object.entries to a typed array to resolve 'unknown' type errors on destructured variables. */}
-                {(Object.entries(subjectStats.chapters) as [string, ChapterStats][]).filter(([,data]) => hasData(data)).map(([chapterName, chapterData]) => {
-                    const chapterMicrotopicScores = Object.values(chapterData.microtopics)
-                        .filter(mt => mt.completed > 0 && (mt.avgDifficulty > 0 || mt.avgAccuracy !== null))
-                        .map(mt => calculateOverallScore(mt.avgDifficulty, mt.avgAccuracy));
-                    
-                    const chapterAvgScore = chapterMicrotopicScores.length > 0
-                        ? chapterMicrotopicScores.reduce((a, b) => a + b, 0) / chapterMicrotopicScores.length
-                        : 0;
-
-                    return (
-                        <div key={chapterName} className={cn("rounded-lg overflow-hidden border border-white/10", chapterAvgScore > 0 && getScoreBgClass(chapterAvgScore))}>
-                            <div className="p-3 cursor-pointer bg-slate-900/30 hover:bg-slate-900/50" onClick={() => toggleExpand(chapterName)}>
-                                <div className="flex justify-between items-center">
-                                    <p className="font-semibold flex items-center gap-2">
-                                        <ChevronDownIcon className={cn("w-4 h-4 transition-transform", expanded[chapterName] ? 'rotate-180' : '')}/>
-                                        {chapterName}
-                                    </p>
-                                    <div className="flex items-center gap-4 text-xs">
-                                        <span title="Number of times chapter is included in test plans" className="font-semibold">In Tests: {chapterTestFrequency[subjectName]?.[chapterName] || 0}</span>
-                                        <span className={cn("font-bold", getScoreColorClass(chapterAvgScore))}>Score: {chapterAvgScore.toFixed(0)}</span>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-3 gap-2 mt-2 text-center text-xs">
-                                    <div><span className="text-gray-400">Completion</span><br/>{chapterData.completionRate.toFixed(1)}% ({chapterData.completed}/{chapterData.total})</div>
-                                    <div><span className="text-gray-400">Avg. Difficulty</span><br/>{chapterData.avgDifficulty > 0 ? chapterData.avgDifficulty.toFixed(2) : 'N/A'}</div>
-                                    <div><span className="text-gray-400">Avg. Accuracy</span><br/>{chapterData.avgAccuracy !== null ? `${chapterData.avgAccuracy.toFixed(1)}%` : 'N/A'}</div>
-                                </div>
-                            </div>
+            <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                <table className="w-full text-left text-sm">
+                    <thead className="sticky top-0 bg-brand-blue-900/80 backdrop-blur-sm z-10">
+                        <tr className="border-b border-white/20 text-xs uppercase text-gray-400">
+                            <th className="p-3">Topic</th>
+                            <th className="p-3 text-center" title="Number of times chapter is included in test plans">In Tests</th>
+                            <th className="p-3 text-center">Completed / Total</th>
+                            <th className="p-3 text-center">Completion %</th>
+                            <th className="p-3 text-center">Avg. Difficulty</th>
+                            <th className="p-3 text-center">Avg. Accuracy</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {/* FIX: Cast the result of Object.entries to a typed array to resolve 'unknown' type errors on destructured variables. */}
+                        {(Object.entries(subjectStats.chapters) as [string, ChapterStats][]).filter(([,data]) => hasData(data)).map(([chapterName, chapterData]) => {
+                            const chapterMicrotopicScores = Object.values(chapterData.microtopics)
+                                .filter(mt => mt.completed > 0 && (mt.avgDifficulty > 0 || mt.avgAccuracy !== null))
+                                .map(mt => calculateOverallScore(mt.avgDifficulty, mt.avgAccuracy));
                             
-                            {expanded[chapterName] && (
-                                <div className="bg-black/20 text-gray-400 text-xs">
+                            const chapterAvgScore = chapterMicrotopicScores.length > 0
+                                ? chapterMicrotopicScores.reduce((a, b) => a + b, 0) / chapterMicrotopicScores.length
+                                : 0;
+
+                            return (
+                                <React.Fragment key={chapterName}>
+                                    <tr className={cn("border-b border-white/10 bg-slate-900/30 cursor-pointer", chapterAvgScore > 0 && getScoreBgClass(chapterAvgScore))} onClick={() => toggleExpand(chapterName)}>
+                                        <td className="p-3 font-semibold flex items-center gap-2">
+                                            <ChevronDownIcon className={cn("w-4 h-4 transition-transform", expanded[chapterName] ? 'rotate-180' : '')}/>
+                                            {chapterName}
+                                        </td>
+                                        <td className="p-3 text-center font-semibold">{chapterTestFrequency[subjectName]?.[chapterName] || 0}</td>
+                                        <td className="p-3 text-center">{chapterData.completed} / {chapterData.total}</td>
+                                        <td className="p-3 text-center">{chapterData.completionRate.toFixed(1)}%</td>
+                                        <td className="p-3 text-center">{chapterData.avgDifficulty > 0 ? chapterData.avgDifficulty.toFixed(2) : 'N/A'}</td>
+                                        <td className="p-3 text-center">{chapterData.avgAccuracy !== null ? `${chapterData.avgAccuracy.toFixed(1)}%` : 'N/A'}</td>
+                                    </tr>
                                     {/* FIX: Cast the result of Object.entries to a typed array to resolve 'unknown' type errors on destructured variables. */}
-                                    {(Object.entries(chapterData.microtopics) as [string, MicrotopicStats][]).filter(([,data]) => hasData(data)).map(([microtopicName, microtopicData]) => {
+                                    {expanded[chapterName] && (Object.entries(chapterData.microtopics) as [string, MicrotopicStats][]).filter(([,data]) => hasData(data)).map(([microtopicName, microtopicData]) => {
                                         const microtopicScore = calculateOverallScore(microtopicData.avgDifficulty, microtopicData.avgAccuracy);
                                         return (
-                                            <div key={microtopicName} className="border-t border-white/10 p-3 cursor-pointer transition-colors hover:bg-black/40" onClick={(e) => { e.stopPropagation(); onMicrotopicClick(subjectName, chapterName, microtopicName)}}>
-                                                <div className="flex justify-between items-center">
-                                                    <p className={cn(getScoreColorClass(microtopicScore), "font-semibold")}>{microtopicName}</p>
-                                                    <span className="font-bold">{microtopicScore.toFixed(0)}</span>
-                                                </div>
-                                                <div className="grid grid-cols-3 gap-2 mt-1 text-center text-[10px]">
-                                                    <div>{microtopicData.completionRate.toFixed(0)}% ({microtopicData.completed}/{microtopicData.total})</div>
-                                                    <div>{microtopicData.avgDifficulty > 0 ? microtopicData.avgDifficulty.toFixed(2) : 'N/A'}</div>
-                                                    <div>{microtopicData.avgAccuracy !== null ? `${microtopicData.avgAccuracy.toFixed(0)}%` : 'N/A'}</div>
-                                                </div>
-                                            </div>
+                                            <tr key={microtopicName} className="bg-black/20 text-gray-400 cursor-pointer transition-colors hover:bg-black/40" onClick={(e) => { e.stopPropagation(); onMicrotopicClick(subjectName, chapterName, microtopicName)}}>
+                                                <td className={cn("py-2 px-3 pl-12 text-xs", microtopicScore > 0 && getScoreColorClass(microtopicScore))}>{microtopicName}</td>
+                                                <td></td>
+                                                <td className="py-2 px-3 text-center">{microtopicData.completed} / {microtopicData.total}</td>
+                                                <td className="py-2 px-3 text-center">{microtopicData.completionRate.toFixed(1)}%</td>
+                                                <td className="py-2 px-3 text-center">{microtopicData.avgDifficulty > 0 ? microtopicData.avgDifficulty.toFixed(2) : 'N/A'}</td>
+                                                <td className="py-2 px-3 text-center">{microtopicData.avgAccuracy !== null ? `${microtopicData.avgAccuracy.toFixed(1)}%` : 'N/A'}</td>
+                                            </tr>
                                         )
                                     })}
-                                </div>
-                            )}
-                        </div>
-                    )
-                })}
+                                </React.Fragment>
+                            )
+                        })}
+                    </tbody>
+                </table>
             </div>
         </Card>
     )

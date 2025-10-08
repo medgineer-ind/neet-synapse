@@ -11,7 +11,7 @@ const LiveBackground: React.FC = () => {
 
         let animationFrameId: number;
         let particles: Particle[] = [];
-        const numParticles = window.innerWidth < 768 ? 35 : 70;
+        const numParticles = 70;
         
         const resizeCanvas = () => {
             canvas.width = window.innerWidth;

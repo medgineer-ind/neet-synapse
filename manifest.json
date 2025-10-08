@@ -1,24 +1,22 @@
 {
-  "background_color": "#ffffff",
-  "dir": "ltr",
+  "name": "NEET Synapse",
+  "short_name": "NEET Synapse",
+  "description": "A futuristic, web-based planner to help students organize, track, and analyze their NEET preparation. It features task planning, progress dashboards, and operates fully offline using localStorage.",
+  "start_url": "./index.html",
   "display": "standalone",
-  "name": "neetsynapse.vercel",
-  "orientation": "any",
-  "scope": "neetsynapse.vercel.app",
-  "short_name": "neetsynapse.vercel",
-  "start_url": "https://neetsynapse.vercel.app/",
-  "theme_color": "#0A192F",
+  "background_color": "#0A192F",
+  "theme_color": "#00EFFF",
+  "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "https://neetsynapse.vercel.app/icon-192.png",
-      "isSquare": false,
-      "isPng": true,
-      "isWebp": false,
-      "isJpg": false,
-      "width": 0,
-      "is512x512": false,
-      "is256x256": false,
-      "is192x192": false
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
     }
   ]
 }
