@@ -44,9 +44,9 @@ const Insights: React.FC<InsightsProps> = ({ tasks, testPlans, targetScore }) =>
     const completedTasks = useMemo(() => tasks.filter(t => t.status === 'Completed'), [tasks]);
 
     const pastInsights = useMemo(() => {
-        if (completedTasks.length === 0) return null;
+        if (completedTasks.length < 10) return null;
 
-        // Peak Performance Day
+        // --- Top 5 Peak Performance Days ---
         const dailyTotals: { [date: string]: number } = {};
         completedTasks.forEach(task => {
             task.sessions.forEach(session => {
@@ -54,50 +54,100 @@ const Insights: React.FC<InsightsProps> = ({ tasks, testPlans, targetScore }) =>
                 dailyTotals[dateStr] = (dailyTotals[dateStr] || 0) + session.duration;
             });
         });
-        const peakDay = Object.entries(dailyTotals).sort((a, b) => b[1] - a[1])[0];
+        const peakDays = Object.entries(dailyTotals)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([date, duration]) => ({ date, duration }));
 
-        // Biggest Breakthrough
+        // --- Biggest Breakthrough (by Chapter per Subject) ---
         const sortedTasks = [...completedTasks].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         const midPointIndex = Math.floor(sortedTasks.length / 2);
         const firstHalf = sortedTasks.slice(0, midPointIndex);
         const secondHalf = sortedTasks.slice(midPointIndex);
         
-        let biggestImprovement = { subject: null as SubjectName | null, change: -100 };
-        (Object.keys(syllabus) as SubjectName[]).forEach(subject => {
-            const getAvgScore = (taskSet: Task[]) => {
-                const subjectTasks = taskSet.filter(t => t.subject === subject);
-                if (subjectTasks.length === 0) return null;
-                const totalScore = subjectTasks.reduce((sum, task) => {
-                    const stats = progressStats.subjects[subject]?.chapters[task.chapter]?.microtopics[task.microtopics[0]];
-                    return stats ? sum + calculateOverallScore(stats.avgDifficulty, stats.avgAccuracy) : sum;
-                }, 0);
-                return totalScore / subjectTasks.length;
-            };
-            const firstScore = getAvgScore(firstHalf);
-            const secondScore = getAvgScore(secondHalf);
+        const breakthroughsBySubject: { [key in SubjectName]?: { chapter: string; change: number }[] } = {};
 
-            if (firstScore !== null && secondScore !== null && (secondScore - firstScore) > biggestImprovement.change) {
-                biggestImprovement = { subject, change: secondScore - firstScore };
+        // Helper to efficiently group tasks by subject and chapter
+        const groupTasks = (taskSet: Task[]) => {
+            return taskSet.reduce((acc, task) => {
+                if (!acc[task.subject]) acc[task.subject] = {};
+                if (!acc[task.subject][task.chapter]) acc[task.subject][task.chapter] = [];
+                acc[task.subject][task.chapter].push(task);
+                return acc;
+            }, {} as Record<SubjectName, Record<string, Task[]>>);
+        };
+        
+        const firstHalfTasksByChapter = groupTasks(firstHalf);
+        const secondHalfTasksByChapter = groupTasks(secondHalf);
+
+        const calculateAvgScoreForTasks = (taskSet: Task[]): number | null => {
+            if (taskSet.length === 0) return null;
+            let totalScore = 0;
+            let scoredTaskCount = 0;
+            taskSet.forEach(task => {
+                if (task.status === 'Completed') {
+                    const accuracy = (task.totalQuestions && task.totalQuestions > 0 && task.correctAnswers !== undefined) ? (task.correctAnswers / task.totalQuestions) * 100 : null;
+                    const score = calculateOverallScore(task.difficulty || 0, accuracy);
+                    if (score > 0) {
+                        totalScore += score;
+                        scoredTaskCount++;
+                    }
+                }
+            });
+            return scoredTaskCount > 0 ? totalScore / scoredTaskCount : null;
+        };
+        
+        (Object.keys(syllabus) as SubjectName[]).forEach(subject => {
+            const chapterImprovements: { chapter: string; change: number }[] = [];
+            Object.keys(syllabus[subject]).forEach(chapterName => {
+                const firstHalfChapterTasks = firstHalfTasksByChapter[subject]?.[chapterName] || [];
+                const secondHalfChapterTasks = secondHalfTasksByChapter[subject]?.[chapterName] || [];
+
+                const firstScore = calculateAvgScoreForTasks(firstHalfChapterTasks);
+                const secondScore = calculateAvgScoreForTasks(secondHalfChapterTasks);
+
+                if (firstScore !== null && secondScore !== null) {
+                    const change = secondScore - firstScore;
+                    if (change > 5) { // Only show meaningful improvements
+                        chapterImprovements.push({ chapter: chapterName, change });
+                    }
+                }
+            });
+
+            if (chapterImprovements.length > 0) {
+                breakthroughsBySubject[subject] = chapterImprovements.sort((a, b) => b.change - a.change).slice(0, 3);
             }
         });
 
-        // Most Practiced Chapter
-        const practiceCounts: { [key: string]: number } = {};
-        completedTasks.filter(t => t.taskType === 'Practice').forEach(task => {
-            const key = `${task.chapter} (${task.subject})`;
-            practiceCounts[key] = (practiceCounts[key] || 0) + (task.totalQuestions || 0);
+
+        // --- Most Practiced Chapters (by Subject) ---
+        const mostPracticedBySubject: { [key in SubjectName]?: { chapter: string; count: number }[] } = {};
+        const practiceTasks = completedTasks.filter(t => t.taskType === 'Practice' && t.totalQuestions && t.totalQuestions > 0);
+
+        (Object.keys(syllabus) as SubjectName[]).forEach(subject => {
+            const subjectPracticeTasks = practiceTasks.filter(t => t.subject === subject);
+            const chapterCounts: { [chapter: string]: number } = {};
+            
+            subjectPracticeTasks.forEach(task => {
+                chapterCounts[task.chapter] = (chapterCounts[task.chapter] || 0) + task.totalQuestions!;
+            });
+
+            const sortedChapters = Object.entries(chapterCounts)
+                .map(([chapter, count]) => ({ chapter, count }))
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 3);
+
+            if (sortedChapters.length > 0) {
+                mostPracticedBySubject[subject] = sortedChapters;
+            }
         });
-        const mostPracticed = Object.entries(practiceCounts).sort((a, b) => b[1] - a[1])[0];
 
         return {
-            peakDayDate: peakDay ? new Date(new Date(peakDay[0]).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString() : 'N/A',
-            peakDayDuration: peakDay ? formatDuration(peakDay[1]) : 'N/A',
-            breakthroughSubject: biggestImprovement.subject,
-            breakthroughChange: biggestImprovement.change,
-            mostPracticedChapter: mostPracticed ? mostPracticed[0] : 'N/A',
-            mostPracticedCount: mostPracticed ? mostPracticed[1] : 0,
+            peakDays,
+            breakthroughsBySubject,
+            mostPracticedBySubject,
         };
-    }, [completedTasks, progressStats]);
+    }, [completedTasks]);
 
      const presentInsights = useMemo(() => {
         const fourteenDaysAgo = new Date();
@@ -196,11 +246,65 @@ const Insights: React.FC<InsightsProps> = ({ tasks, testPlans, targetScore }) =>
             <h1 className="text-3xl font-bold text-brand-cyan-400">Temporal Insight Engine</h1>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <InsightCard title="Preparation Rewind" icon={<HistoryIcon />} colorClass="border-blue-500">
-                    {pastInsights ? <>
-                        <InfoPill label="Peak Performance Day" value={pastInsights.peakDayDuration} subtext={pastInsights.peakDayDate} icon={<ClockIcon className="w-5 h-5 text-yellow-300" />} />
-                        <InfoPill label="Biggest Breakthrough" value={pastInsights.breakthroughSubject || 'N/A'} subtext={`+${pastInsights.breakthroughChange.toFixed(1)} score change`} icon={<TrendingUpIcon className="w-5 h-5 text-green-400" />} />
-                        <InfoPill label="Most Practiced Chapter" value={`${pastInsights.mostPracticedCount} Qs`} subtext={pastInsights.mostPracticedChapter} icon={<TargetIcon className="w-5 h-5 text-purple-400" />} />
-                    </> : <p className="text-gray-400">Complete more tasks to unlock insights about your past performance.</p>}
+                    {pastInsights ? (
+                        <>
+                            <div>
+                                <h3 className="font-semibold text-gray-200 mb-2 flex items-center gap-2"><ClockIcon className="w-5 h-5 text-yellow-300" /> Top 5 Peak Performance Days</h3>
+                                {pastInsights.peakDays.length > 0 ? (
+                                    <ul className="space-y-2 text-sm">
+                                        {pastInsights.peakDays.map((day, index) => (
+                                            <li key={index} className="flex justify-between items-center p-2 bg-black/30 rounded">
+                                                <span>{new Date(new Date(day.date).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</span>
+                                                <strong className="text-yellow-300">{formatDuration(day.duration)}</strong>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : <p className="text-xs text-gray-400">Not enough data.</p>}
+                            </div>
+
+                            <div className="border-t border-white/10 pt-4 mt-4">
+                                <h3 className="font-semibold text-gray-200 mb-2 flex items-center gap-2"><TrendingUpIcon className="w-5 h-5 text-green-400" /> Biggest Breakthroughs (by Chapter)</h3>
+                                <div className="space-y-3">
+                                    {Object.keys(pastInsights.breakthroughsBySubject).length > 0 ? (
+                                        (Object.keys(pastInsights.breakthroughsBySubject) as SubjectName[]).map(subject => (
+                                            <div key={subject}>
+                                                <h4 className="font-bold text-sm text-brand-cyan-300">{subject}</h4>
+                                                <ul className="text-xs space-y-1 mt-1 pl-2">
+                                                    {pastInsights.breakthroughsBySubject[subject]?.map((item, idx) => (
+                                                        <li key={idx}>
+                                                           {item.chapter}: <span className="text-green-400 font-semibold">+{item.change.toFixed(1)} score change</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        ))
+                                    ) : <p className="text-xs text-gray-400">Not enough variation in performance detected yet.</p>}
+                                </div>
+                            </div>
+
+                            <div className="border-t border-white/10 pt-4 mt-4">
+                                <h3 className="font-semibold text-gray-200 mb-2 flex items-center gap-2"><TargetIcon className="w-5 h-5 text-purple-400" /> Most Practiced Chapters</h3>
+                                <div className="space-y-3">
+                                     {Object.keys(pastInsights.mostPracticedBySubject).length > 0 ? (
+                                        (Object.keys(pastInsights.mostPracticedBySubject) as SubjectName[]).map(subject => (
+                                             <div key={subject}>
+                                                <h4 className="font-bold text-sm text-brand-cyan-300">{subject}</h4>
+                                                 <ul className="text-xs space-y-1 mt-1 pl-2">
+                                                    {pastInsights.mostPracticedBySubject[subject]?.map((item, idx) => (
+                                                        <li key={idx}>
+                                                            {item.chapter}: <span className="text-purple-300 font-semibold">{item.count} Questions</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        ))
+                                     ) : <p className="text-xs text-gray-400">Complete more practice tasks to see patterns.</p>}
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <p className="text-gray-400">Complete at least 10 tasks to unlock insights about your past performance.</p>
+                    )}
                 </InsightCard>
 
                 <InsightCard title="Current Snapshot" icon={<CrosshairIcon />} colorClass="border-yellow-500">

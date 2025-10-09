@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Task, TestPlan, SubjectName, ProgressStats, ChapterStats, SubjectStats } from '../types';
+import { Task, TestPlan, SubjectName, ProgressStats, ChapterStats, SubjectStats, MicrotopicStats, StudySession } from '../types';
 import { Card } from './ui/StyledComponents';
 import { calculateProgress, calculateOverallScore, getScoreBgClass, getScoreColorClass } from '../lib/utils';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend, ResponsiveContainer, Tooltip } from 'recharts';
@@ -98,7 +98,7 @@ const SubjectRadarChart: React.FC<{ data: any[] }> = ({ data }) => {
 const Achievements: React.FC<{ achievements: any[] }> = ({ achievements }) => (
     <Card className="p-6">
         <h2 className="text-xl font-semibold text-brand-cyan-400 mb-4">Achievements & Streaks</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
             {achievements.map(ach => (
                 <div key={ach.name} className={cn(
                     "p-3 flex flex-col items-center text-center rounded-lg transition-all duration-300",
@@ -108,7 +108,8 @@ const Achievements: React.FC<{ achievements: any[] }> = ({ achievements }) => (
                         {ach.icon}
                     </div>
                     <p className="text-xs font-bold">{ach.name}</p>
-                    <p className="text-[10px] text-gray-400">{ach.isUnlocked ? `Unlocked!` : ach.description}</p>
+                    <p className="text-[10px] text-gray-400 leading-tight">{ach.description}</p>
+                    {ach.detail && <p className="text-[10px] text-gray-500">{ach.detail}</p>}
                 </div>
             ))}
         </div>
@@ -143,7 +144,6 @@ const KnowledgeNetwork: React.FC<{ progress: ProgressStats }> = ({ progress }) =
                                     {subjectIcons[subjectName]}
                                     <p className="text-xs font-bold">{subjectName}</p>
                                 </div>
-                                {/* FIX: Cast the result of Object.entries to the correct tuple type [string, ChapterStats] to resolve type inference issues. */}
                                 {(Object.entries(subjectData.chapters) as [string, ChapterStats][]).map(([chapterName, chapterData], chap_i, chap_arr) => {
                                     if (chapterData.completed === 0) return null;
                                     const score = calculateOverallScore(chapterData.avgDifficulty, chapterData.avgAccuracy);
@@ -218,7 +218,6 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
         const metrics = ['Completion', 'Knowledge', 'Time Invested', 'Practice Accuracy', 'Test Performance'];
         const data: any[] = [];
         
-        {/* FIX: Cast the result of Object.values to SubjectStats[] to ensure TypeScript correctly infers the type of `s`. */}
         const subjectTimes = (Object.values(progressStats.subjects) as SubjectStats[]).map(s => s.totalTime);
         const maxTime = Math.max(...subjectTimes, 1);
         
@@ -257,10 +256,74 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
 
     const achievements = useMemo(() => {
         const completedTasks = tasks.filter(t => t.status === 'Completed');
+        const todayStr = new Date().toISOString().split('T')[0];
         
-        // Consistency Streak
-        // Fix: The original flatMap and map combination was causing a type inference issue. This was refactored into a single, safer flatMap that correctly infers the type as string[].
-        const studyDays: string[] = [...new Set(completedTasks.flatMap(t => (t.sessions || []).map(s => s.date.split('T')[0])))].sort();
+        // --- Daily Subject Completion Achievements ---
+        const todayTasks = tasks.filter(t => t.date === todayStr);
+        const dailyAchievements = (Object.keys(syllabus) as SubjectName[]).map(subjectName => {
+            const subjectTasksToday = todayTasks.filter(t => t.subject === subjectName);
+            const allCompleted = subjectTasksToday.length > 0 && subjectTasksToday.every(t => t.status === 'Completed');
+            const subjectIcons = {
+                Physics: <AtomIcon className="w-6 h-6 text-fuchsia-400" />,
+                Chemistry: <FlaskConicalIcon className="w-6 h-6 text-emerald-400" />,
+                Botany: <LeafIcon className="w-6 h-6 text-lime-400" />,
+                Zoology: <DnaIcon className="w-6 h-6 text-sky-400" />,
+            };
+            return {
+                name: `Today's ${subjectName} Finisher`,
+                description: `Complete all ${subjectName} tasks today`,
+                icon: subjectIcons[subjectName],
+                isUnlocked: allCompleted
+            };
+        });
+
+        // --- Completion Streak (All tasks on a day completed) ---
+        // FIX: By providing a typed initial value, the type of the accumulator `acc` is correctly inferred.
+        const tasksByDate = tasks.reduce((acc: Record<string, Task[]>, task) => {
+            const dateStr = task.date;
+            if (!acc[dateStr]) {
+                acc[dateStr] = [];
+            }
+            acc[dateStr].push(task);
+            return acc;
+        }, {});
+
+        const completedDays = Object.keys(tasksByDate)
+            .filter((dateStr) => {
+                const dayTasks = tasksByDate[dateStr];
+                return dayTasks.length > 0 && dayTasks.every(t => t.status === 'Completed');
+            })
+            .sort();
+
+        let completionStreak = 0;
+        if (completedDays.length > 0) {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toISOString().split('T')[0];
+            const lastCompletedDay = completedDays[completedDays.length - 1];
+
+            // Streak is only current if the last completed day was today or yesterday
+            if (lastCompletedDay === todayStr || lastCompletedDay === yesterdayStr) {
+                completionStreak = 1;
+                for (let i = completedDays.length - 1; i > 0; i--) {
+                    const current = new Date(completedDays[i]);
+                    const prev = new Date(completedDays[i - 1]);
+                    const diff = (current.getTime() - prev.getTime()) / (1000 * 3600 * 24);
+                    if (diff === 1) {
+                        completionStreak++;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // --- Study Streak (At least one task session on a day) ---
+        const studyDays: string[] = [...new Set(
+            completedTasks
+                .reduce((acc, t) => acc.concat(t.sessions || []), [] as StudySession[])
+                .map(s => s.date.split('T')[0])
+        )].sort();
         let consistencyStreak = 0;
         if (studyDays.length > 0) {
             consistencyStreak = 1;
@@ -276,7 +339,7 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
             }
         }
 
-        // Accuracy Streak
+        // --- Accuracy Streak (High accuracy in practice) ---
         const practiceTasks = completedTasks.filter(t => t.taskType === 'Practice' && t.totalQuestions && t.totalQuestions > 0)
             .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         let accuracyStreak = 0;
@@ -290,16 +353,66 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
             }
         }
 
+        // --- Tiered Test Titan Achievement ---
+        const completedTestCount = testPlans.filter(t => t.status === 'Completed').length;
+        let testTitanName = "Test Taker";
+        let testTitanGoal = 1;
+        let testTitanIconColor = "text-gray-600";
+
+        if (completedTestCount >= 25) {
+            testTitanName = "Test Titan";
+            testTitanGoal = completedTestCount; // no more goal
+            testTitanIconColor = "text-yellow-300";
+        } else if (completedTestCount >= 10) {
+            testTitanName = "Test Veteran";
+            testTitanGoal = 25;
+            testTitanIconColor = "text-slate-300";
+        } else if (completedTestCount >= 5) {
+            testTitanName = "Test Analyst";
+            testTitanGoal = 10;
+            testTitanIconColor = "text-amber-500";
+        } else if (completedTestCount >= 1) {
+            testTitanName = "Test Taker";
+            testTitanGoal = 5;
+            testTitanIconColor = "text-stone-400";
+        }
+
+        const testTitanAchievement = {
+            name: `${testTitanName} (${completedTestCount})`,
+            description: testTitanGoal === completedTestCount ? `Goal Reached!` : `Next: ${testTitanGoal} tests`,
+            icon: <TrophyIcon className={`w-6 h-6 ${testTitanIconColor}`} />,
+            isUnlocked: completedTestCount > 0
+        };
+        if (completedTestCount === 0) {
+            testTitanAchievement.name = "Test Taker";
+            testTitanAchievement.description = "Complete 1 test";
+        }
+
+        // --- Contextual Perfect Score Achievement ---
+        const perfectScoreTests = testPlans.filter(t => t.status === 'Completed' && t.analysis && t.analysis.marksObtained === t.analysis.totalMarks && t.analysis.totalMarks > 0);
+        const perfectScoreCount = perfectScoreTests.length;
+        const mostRecentPerfectScoreTest = perfectScoreTests.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+        const perfectScoreAchievement = {
+            name: perfectScoreCount > 1 ? `Perfect Score (x${perfectScoreCount})` : "Perfect Score",
+            description: mostRecentPerfectScoreTest ? `In "${mostRecentPerfectScoreTest.name}"` : "Get 100% on a test",
+            icon: <CheckCircleIcon className="w-6 h-6 text-white" />,
+            isUnlocked: perfectScoreCount > 0,
+            detail: mostRecentPerfectScoreTest ? `on ${new Date(new Date(mostRecentPerfectScoreTest.date).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString()}` : ""
+        };
+
         return [
-            { name: `${consistencyStreak}-Day Streak`, description: "Study on consecutive days", icon: <ActivityIcon className="w-6 h-6 text-yellow-400" />, isUnlocked: consistencyStreak > 1 },
-            { name: "Accuracy Ace", description: "High accuracy streak", icon: <TargetIcon className="w-6 h-6 text-green-400" />, isUnlocked: accuracyStreak >= 3 },
-            { name: "Physics Phanom", description: "Complete Physics", icon: <AtomIcon className="w-6 h-6 text-fuchsia-400" />, isUnlocked: progressStats.subjects.Physics.completionRate === 100 },
+            ...dailyAchievements,
+            { name: `${completionStreak}-Day Completion Streak`, description: "Complete all tasks on consecutive days", icon: <CheckCircleIcon className="w-6 h-6 text-brand-cyan-400" />, isUnlocked: completionStreak > 1 },
+            { name: `${consistencyStreak}-Day Study Streak`, description: "Study on consecutive days", icon: <ActivityIcon className="w-6 h-6 text-yellow-400" />, isUnlocked: consistencyStreak > 1 },
+            { name: "Accuracy Ace", description: `High accuracy streak (${accuracyStreak})`, icon: <TargetIcon className="w-6 h-6 text-green-400" />, isUnlocked: accuracyStreak >= 3 },
+            { name: "Physics Phenom", description: "Complete Physics", icon: <AtomIcon className="w-6 h-6 text-fuchsia-400" />, isUnlocked: progressStats.subjects.Physics.completionRate === 100 },
             { name: "Chem Champion", description: "Complete Chemistry", icon: <FlaskConicalIcon className="w-6 h-6 text-emerald-400" />, isUnlocked: progressStats.subjects.Chemistry.completionRate === 100 },
             { name: "Botany Boss", description: "Complete Botany", icon: <LeafIcon className="w-6 h-6 text-lime-400" />, isUnlocked: progressStats.subjects.Botany.completionRate === 100 },
             { name: "Zoology Zenith", description: "Complete Zoology", icon: <DnaIcon className="w-6 h-6 text-sky-400" />, isUnlocked: progressStats.subjects.Zoology.completionRate === 100 },
-            { name: "Test Titan", description: "Complete a test", icon: <TrophyIcon className="w-6 h-6 text-brand-cyan-400" />, isUnlocked: testPlans.some(t => t.status === 'Completed') },
-            { name: "Perfect Score", description: "100% on a test", icon: <CheckCircleIcon className="w-6 h-6 text-white" />, isUnlocked: testPlans.some(t => t.analysis?.marksObtained === t.analysis?.totalMarks) },
-        ];
+            testTitanAchievement,
+            perfectScoreAchievement,
+        ].filter(Boolean);
     }, [tasks, testPlans, progressStats]);
     
     return (

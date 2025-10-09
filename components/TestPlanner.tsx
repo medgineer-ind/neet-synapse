@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { TestPlan, SubjectName, AnalyzedTopic, Task, TopicStatus, TestPlanAnalysis, TopicPracticeAttempt, ProgressStats, ActiveTimer, SubjectTestPerformance, ChapterStats, MicrotopicStats } from '../types';
 import { syllabus } from '../data/syllabus';
 import { cn, calculateProgress, analyzeSyllabusForTest, formatDuration, calculateOverallScore, getScoreColorClass } from '../lib/utils';
-import { PlusIcon, Trash2Icon, BrainIcon, ClipboardCheckIcon, ClockIcon, RepeatIcon, TargetIcon, TrophyIcon, AtomIcon, FlaskConicalIcon, LeafIcon, DnaIcon, ChevronDownIcon } from './ui/Icons';
+import { PlusIcon, Trash2Icon, BrainIcon, ClipboardCheckIcon, ClockIcon, RepeatIcon, TargetIcon, TrophyIcon, AtomIcon, FlaskConicalIcon, LeafIcon, DnaIcon, ChevronDownIcon, TrendingUpIcon } from './ui/Icons';
 import { Card, Button, Input, Modal } from './ui/StyledComponents';
 import { TimeEditor } from './ui/TimeEditor';
 
@@ -41,6 +41,7 @@ const TopicAnalysis: React.FC<{ weakTopics: AnalyzedTopic[]; averageTopics: Anal
 const CreateTestModal: React.FC<{ isOpen: boolean; onClose: () => void; onAddTest: (test: Omit<TestPlan, 'id'|'status'>) => void; tasks: Task[] }> = ({ isOpen, onClose, onAddTest, tasks }) => {
     const [name, setName] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [totalQuestions, setTotalQuestions] = useState('');
     const [selectedSyllabus, setSelectedSyllabus] = useState<TestPlan['syllabus']>({});
     
     const progressStats = useMemo(() => calculateProgress(tasks), [tasks]);
@@ -64,8 +65,8 @@ const CreateTestModal: React.FC<{ isOpen: boolean; onClose: () => void; onAddTes
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!name.trim() || Object.keys(selectedSyllabus).length === 0) {
-            alert('Please provide a test name and select at least one chapter.');
+        if (!name.trim() || Object.keys(selectedSyllabus).length === 0 || !totalQuestions) {
+            alert('Please provide a test name, total questions, and select at least one chapter.');
             return;
         }
         
@@ -83,10 +84,11 @@ const CreateTestModal: React.FC<{ isOpen: boolean; onClose: () => void; onAddTes
             });
         });
 
-        onAddTest({ name, date, syllabus: selectedSyllabus, topicStatus });
+        onAddTest({ name, date, syllabus: selectedSyllabus, topicStatus, totalQuestions: Number(totalQuestions) });
         // Reset form
         setName('');
         setDate(new Date().toISOString().split('T')[0]);
+        setTotalQuestions('');
         setSelectedSyllabus({});
         onClose();
     };
@@ -94,9 +96,14 @@ const CreateTestModal: React.FC<{ isOpen: boolean; onClose: () => void; onAddTes
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Plan a New Test">
             <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <Input type="text" placeholder="Test Name (e.g., Mock Test 1)" value={name} onChange={e => setName(e.target.value)} required />
-                    <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div className="md:col-span-2">
+                        <Input type="text" placeholder="Test Name (e.g., Mock Test 1)" value={name} onChange={e => setName(e.target.value)} required />
+                    </div>
+                    <Input type="number" placeholder="Total Questions (e.g., 200)" value={totalQuestions} onChange={e => setTotalQuestions(e.target.value)} min="1" required />
+                    <div className="md:col-span-3">
+                        <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+                    </div>
                 </div>
                 
                 <h3 className="font-semibold text-brand-cyan-400 mb-2">Select Syllabus</h3>
@@ -431,13 +438,27 @@ const TestAnalysisDetails: React.FC<{ test: TestPlan }> = ({ test }) => {
         if (!totalRow || totalRow.totalQuestions === 0) return 0;
         return (totalRow.correct / totalRow.totalQuestions) * 100;
     }, [totalRow]);
+
+    const scoreDiff = useMemo(() => {
+        if (typeof analysis.marksObtained !== 'number' || typeof analysis.predictedScore !== 'number') return null;
+        return analysis.marksObtained - analysis.predictedScore;
+    }, [analysis.marksObtained, analysis.predictedScore]);
     
     return (
          <div className="space-y-4 p-4 bg-black/20 rounded-b-lg animate-fadeIn">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 text-center">
                 <div className="p-2 bg-slate-900/50 rounded-lg">
-                    <p className="text-xs text-gray-400">Score</p>
+                    <p className="text-xs text-gray-400">Actual Score</p>
                     <p className="text-lg font-bold text-brand-cyan-400">{analysis.marksObtained} / {analysis.totalMarks}</p>
+                    {scoreDiff !== null && (
+                         <p className={cn("text-xs font-semibold", scoreDiff >= 0 ? 'text-green-400' : 'text-red-400')}>
+                            {scoreDiff >= 0 ? '+' : ''}{scoreDiff.toFixed(0)} vs Projection
+                        </p>
+                    )}
+                </div>
+                <div className="p-2 bg-slate-900/50 rounded-lg">
+                    <p className="text-xs text-gray-400">Projected Score</p>
+                    <p className="text-lg font-bold text-yellow-300">{analysis.predictedScore} / {analysis.totalMarks}</p>
                 </div>
                 <div className="p-2 bg-slate-900/50 rounded-lg">
                     <p className="text-xs text-gray-400">Percentage</p>
@@ -580,6 +601,54 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, setTasks, testPlans, s
         });
         return { upcomingTests: upcoming, completedTests: completed.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) };
     }, [testPlans]);
+
+    const calculatePredictionForTest = useCallback((test: TestPlan, currentProgress: ProgressStats): number => {
+        if (!test.totalQuestions || test.totalQuestions === 0) {
+            return 0;
+        }
+
+        const overallIncorrectRatio = (currentProgress.totalIncorrect + currentProgress.totalSkipped) > 0
+            ? currentProgress.totalIncorrect / (currentProgress.totalIncorrect + currentProgress.totalSkipped)
+            : 0.75; // If no data, assume 75% of non-correct are incorrect
+
+        let totalSyllabusScore = 0;
+        let scoredMicrotopicsCount = 0;
+
+        test.topicStatus.forEach(topic => {
+            const microtopicStats = currentProgress.subjects[topic.subject]
+                ?.chapters[topic.chapter]
+                ?.microtopics[topic.microtopic];
+
+            if (microtopicStats && microtopicStats.completed > 0) {
+                const score = calculateOverallScore(microtopicStats.avgDifficulty, microtopicStats.avgAccuracy);
+                if (score > 0) {
+                    totalSyllabusScore += score;
+                    scoredMicrotopicsCount++;
+                }
+            }
+        });
+
+        if (scoredMicrotopicsCount === 0) {
+            return 0; // Predict 0 if no topics have been studied
+        }
+
+        const avgCorrectProbability = (totalSyllabusScore / scoredMicrotopicsCount) / 100;
+        const predictedCorrect = test.totalQuestions * avgCorrectProbability;
+        const predictedNotCorrect = test.totalQuestions - predictedCorrect;
+        const predictedIncorrect = predictedNotCorrect * overallIncorrectRatio;
+
+        const predictedScore = (predictedCorrect * 4) - (predictedIncorrect * 1);
+
+        return Math.max(0, Math.round(predictedScore));
+    }, []);
+
+    const testPredictions = useMemo(() => {
+        const predictions: Record<string, number> = {};
+        upcomingTests.forEach(test => {
+            predictions[test.id] = calculatePredictionForTest(test, progressStats);
+        });
+        return predictions;
+    }, [upcomingTests, progressStats, calculatePredictionForTest]);
     
     const detailedPrepTimes = useMemo(() => {
         const details: { [testId: string]: {
@@ -641,15 +710,20 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, setTasks, testPlans, s
         const progressSnapshot = calculateProgress(tasksForSnapshot);
 
         const prepData = detailedPrepTimes[id];
+        const finalPrediction = calculatePredictionForTest(testBeingCompleted, progressStats);
+
         const analysisWithTime: TestPlanAnalysis = { 
             ...analysis, 
+            predictedScore: finalPrediction,
             totalPrepTime: prepData?.total || 0,
             prepTimeByCategory: prepData?.byCategory,
             prepTimeBySubject: prepData?.bySubject,
             progressSnapshot: progressSnapshot
         };
         const updatedTest = { ...testBeingCompleted, status: 'Completed' as const, analysis: analysisWithTime };
-        setTestPlans(testPlans.map(t => t.id === id ? updatedTest : t));
+        
+        setTestPlans(prevPlans => prevPlans.map(t => t.id === id ? updatedTest : t));
+
         setTestToAnalyze(null);
         onAnalysisComplete();
         setViewingTest(updatedTest); // Immediately show the analysis view in a modal
@@ -703,7 +777,7 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, setTasks, testPlans, s
                         {upcomingTests.map(test => (
                             <Card key={test.id} className="p-4 flex flex-col gap-4">
                                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center w-full">
-                                    <div>
+                                    <div className="flex-1 min-w-0">
                                         <p className="font-semibold">{test.name}</p>
                                         <p className="text-sm text-gray-400">{new Date(new Date(test.date).toLocaleString("en-US", { timeZone: "UTC" })).toDateString()}</p>
                                         {(detailedPrepTimes[test.id]?.total || 0) > 0 && (
@@ -713,12 +787,18 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, setTasks, testPlans, s
                                             </div>
                                         )}
                                     </div>
-                                    <div className="flex items-center gap-2 self-end sm:self-center">
-                                        <Button onClick={() => startTestTimer(test)} variant="primary" size="sm" disabled={!!activeTimer}><TrophyIcon className="w-4 h-4"/>Start Test</Button>
-                                        <Button onClick={() => setExpandedTest(expandedTest === test.id ? null : test.id)} variant="secondary" size="sm">
-                                            {expandedTest === test.id ? 'Hide Prep' : 'Start Prep'}
-                                        </Button>
-                                        <button onClick={() => deleteTest(test.id)} className="p-1 text-gray-400 hover:text-red-400 transition-colors"><Trash2Icon className="w-4 h-4" /></button>
+                                    <div className="flex items-center gap-4 self-end sm:self-center">
+                                        <div className="text-right">
+                                            <p className="text-xs text-yellow-300 flex items-center justify-end gap-1"><TrendingUpIcon className="w-4 h-4"/>Projected Score</p>
+                                            <p className="text-2xl font-bold text-yellow-400">{testPredictions[test.id]} / {test.totalQuestions ? test.totalQuestions * 4 : 'N/A'}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button onClick={() => startTestTimer(test)} variant="primary" size="sm" disabled={!!activeTimer}><TrophyIcon className="w-4 h-4"/>Start Test</Button>
+                                            <Button onClick={() => setExpandedTest(expandedTest === test.id ? null : test.id)} variant="secondary" size="sm">
+                                                {expandedTest === test.id ? 'Hide Prep' : 'Start Prep'}
+                                            </Button>
+                                            <button onClick={() => deleteTest(test.id)} className="p-1 text-gray-400 hover:text-red-400 transition-colors"><Trash2Icon className="w-4 h-4" /></button>
+                                        </div>
                                     </div>
                                 </div>
                                 {expandedTest === test.id && (

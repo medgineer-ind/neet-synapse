@@ -1,3 +1,5 @@
+
+
 // Fix: Removed self-import of `SubjectName` and `TaskType` which conflicted with local declarations.
 export type SubjectName = 'Physics' | 'Chemistry' | 'Botany' | 'Zoology';
 export type TaskType = 'Study' | 'Revision' | 'Practice';
@@ -138,6 +140,7 @@ export interface TestPlanAnalysis {
     [key in SubjectName]?: SubjectTestPerformance;
   };
   progressSnapshot?: ProgressStats;
+  predictedScore?: number;
 }
 
 
@@ -168,6 +171,7 @@ export interface TestPlan {
   topicStatus: TopicStatus[];
   status: 'Upcoming' | 'Completed';
   analysis?: TestPlanAnalysis;
+  totalQuestions?: number;
 }
 
 export interface AnalyzedTopic {
