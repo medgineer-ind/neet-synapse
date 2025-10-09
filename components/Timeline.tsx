@@ -7,6 +7,13 @@ import { cn } from '../lib/utils';
 import { BookOpenIcon, RepeatIcon, TargetIcon, TrophyIcon } from './ui/Icons';
 import { Card } from './ui/StyledComponents';
 
+// Fix: Moved AgendaItem type outside the component so it's available in the render scope.
+type AgendaItem = {
+    type: 'task' | 'test';
+    data: Task | TestPlan;
+    date: Date;
+};
+
 const TaskTypeTag: React.FC<{ type: TaskType }> = ({ type }) => {
     const typeStyles: Record<TaskType, { icon: React.ReactElement; className: string }> = {
         Study: { icon: <BookOpenIcon className="w-4 h-4" />, className: "bg-brand-cyan-500/20 text-brand-cyan-400" },
@@ -69,7 +76,8 @@ const AgendaTestItem: React.FC<{ test: TestPlan }> = ({ test }) => {
                         <p className="font-semibold" title={test.name}>Test: {test.name}</p>
                     </div>
                     <p className="text-xs text-gray-400">
-                        Syllabus includes {Object.values(test.syllabus).flat().length} chapters.
+                        {/* FIX: The chapter count logic was causing a TypeScript error due to type inference issues with `reduce`. Replaced with a safer `filter` and `reduce` combination to ensure types are handled correctly, especially with potentially malformed data from localStorage. */}
+                        Syllabus includes {Object.values(test.syllabus || {}).filter(Array.isArray).reduce((sum, chapters) => sum + chapters.length, 0)} chapters.
                     </p>
                 </div>
             </div>
@@ -92,12 +100,6 @@ const ShowCompletedToggle: React.FC<{ checked: boolean; onChange: (checked: bool
     </div>
 );
 
-// FIX: Moved AgendaItem type outside the component to use it for type casting.
-type AgendaItem = {
-    type: 'task' | 'test';
-    data: Task | TestPlan;
-    date: Date;
-};
 
 const Timeline: React.FC = () => {
     const [tasks] = useLocalStorage<Task[]>('tasks', []);
@@ -116,6 +118,7 @@ const Timeline: React.FC = () => {
             ...testPlans.filter(test => test.status === 'Upcoming'),
         ];
         
+
         const items: AgendaItem[] = allPendingItems.map(item => {
             const itemDate = new Date(new Date(item.date).toLocaleString("en-US", { timeZone: "UTC" }));
             itemDate.setHours(0, 0, 0, 0);
@@ -225,12 +228,12 @@ const Timeline: React.FC = () => {
                         <div>
                             <h2 className="text-lg font-bold text-yellow-400 sticky top-20 backdrop-blur-sm py-2 z-10">Upcoming (Next 7 Days)</h2>
                              <div className="space-y-4 mt-2">
-                                {/* FIX: Cast the result of Object.entries to a typed array to resolve 'unknown' type for the 'items' variable. */}
-                                {(Object.entries(upcomingGrouped) as [string, AgendaItem[]][]).map(([date, items]) => (
+                                {Object.entries(upcomingGrouped).map(([date, items]) => (
                                     <div key={date}>
                                         <h3 className="font-semibold text-gray-300">{formatDateHeader(date)}</h3>
                                         <div className="space-y-2 mt-1 pl-4 border-l-2 border-white/10">
-                                            {items.map(item =>
+                                            {/* FIX: Add an Array.isArray check to ensure `items` is an array before mapping over it, preventing runtime errors. */}
+                                            {Array.isArray(items) && items.map(item =>
                                                 item.type === 'task'
                                                     ? <AgendaTaskItem key={(item.data as Task).id} task={item.data as Task} />
                                                     : <AgendaTestItem key={(item.data as TestPlan).id} test={item.data as TestPlan} />

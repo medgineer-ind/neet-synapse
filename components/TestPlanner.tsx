@@ -1,12 +1,10 @@
-
-
-import React, { useState, useMemo } from 'react';
-import useLocalStorage from '../hooks/useLocalStorage';
-import { TestPlan, SubjectName, AnalyzedTopic, Task, TopicStatus, TestPlanAnalysis, TopicPracticeAttempt, ProgressStats } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { TestPlan, SubjectName, AnalyzedTopic, Task, TopicStatus, TestPlanAnalysis, TopicPracticeAttempt, ProgressStats, ActiveTimer, SubjectTestPerformance, ChapterStats, MicrotopicStats } from '../types';
 import { syllabus } from '../data/syllabus';
-import { cn, calculateProgress, analyzeSyllabusForTest, generatePerformanceSummary } from '../lib/utils';
-import { PlusIcon, Trash2Icon, BrainIcon, ClipboardCheckIcon } from './ui/Icons';
+import { cn, calculateProgress, analyzeSyllabusForTest, formatDuration, calculateOverallScore, getScoreColorClass } from '../lib/utils';
+import { PlusIcon, Trash2Icon, BrainIcon, ClipboardCheckIcon, ClockIcon, RepeatIcon, TargetIcon, TrophyIcon, AtomIcon, FlaskConicalIcon, LeafIcon, DnaIcon, ChevronDownIcon } from './ui/Icons';
 import { Card, Button, Input, Modal } from './ui/StyledComponents';
+import { TimeEditor } from './ui/TimeEditor';
 
 // --- New Test Planner Components ---
 
@@ -40,12 +38,11 @@ const TopicAnalysis: React.FC<{ weakTopics: AnalyzedTopic[]; averageTopics: Anal
 );
 
 
-const CreateTestModal: React.FC<{ isOpen: boolean; onClose: () => void; onAddTest: (test: Omit<TestPlan, 'id'|'status'>) => void }> = ({ isOpen, onClose, onAddTest }) => {
+const CreateTestModal: React.FC<{ isOpen: boolean; onClose: () => void; onAddTest: (test: Omit<TestPlan, 'id'|'status'>) => void; tasks: Task[] }> = ({ isOpen, onClose, onAddTest, tasks }) => {
     const [name, setName] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedSyllabus, setSelectedSyllabus] = useState<TestPlan['syllabus']>({});
-    const [tasks] = useLocalStorage<Task[]>('tasks', []);
-
+    
     const progressStats = useMemo(() => calculateProgress(tasks), [tasks]);
     const { weakTopics, averageTopics, strongTopics } = useMemo(() => analyzeSyllabusForTest(selectedSyllabus, progressStats), [selectedSyllabus, progressStats]);
 
@@ -134,56 +131,133 @@ const CreateTestModal: React.FC<{ isOpen: boolean; onClose: () => void; onAddTes
     );
 };
 
-const TestAnalysisModal: React.FC<{ test: TestPlan | null, onClose: () => void, onComplete: (id: string, analysis: TestPlanAnalysis) => void }> = ({ test, onClose, onComplete }) => {
-    const [marksObtained, setMarksObtained] = useState('');
-    const [totalMarks, setTotalMarks] = useState('');
+const TestAnalysisModal: React.FC<{ test: TestPlan | null, initialDuration: number, onClose: () => void, onComplete: (id: string, analysis: TestPlanAnalysis) => void }> = ({ test, initialDuration, onClose, onComplete }) => {
+    const [subjectData, setSubjectData] = useState<Record<string, { total: string, correct: string, incorrect: string }>>({});
     const [rank, setRank] = useState('');
     const [percentile, setPercentile] = useState('');
     const [notes, setNotes] = useState('');
+    const [duration, setDuration] = useState(initialDuration);
+
+    useEffect(() => {
+        setDuration(initialDuration);
+        setRank('');
+        setPercentile('');
+        setNotes('');
+        if (test?.syllabus) {
+            const initialData = (Object.keys(test.syllabus) as SubjectName[]).reduce((acc, subject) => {
+                acc[subject] = { total: '', correct: '', incorrect: '' };
+                return acc;
+            }, {} as Record<string, { total: string; correct: string; incorrect: string }>);
+            setSubjectData(initialData);
+        }
+    }, [initialDuration, test]);
+
+    const handleSubjectDataChange = (subject: SubjectName, field: 'total' | 'correct' | 'incorrect', value: string) => {
+        setSubjectData(prev => ({
+            ...prev,
+            [subject]: { ...prev[subject], [field]: value }
+        }));
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!test) return;
+
+        let totalMarksObtained = 0;
+        let totalPossibleMarks = 0;
+        const performance: { [key in SubjectName]?: SubjectTestPerformance } = {};
+
+        for (const subject in subjectData) {
+            const data = subjectData[subject];
+            const totalNum = Number(data.total);
+            const correctNum = Number(data.correct);
+            const incorrectNum = Number(data.incorrect);
+
+            if (isNaN(totalNum) || isNaN(correctNum) || isNaN(incorrectNum) || totalNum < 0 || correctNum < 0 || incorrectNum < 0) {
+                alert(`Please enter valid numbers for ${subject}.`);
+                return;
+            }
+            if ((correctNum + incorrectNum) > totalNum) {
+                alert(`For ${subject}, the sum of correct and incorrect answers cannot exceed the total questions.`);
+                return;
+            }
+
+            const skipped = totalNum - (correctNum + incorrectNum);
+            const score = (correctNum * 4) - incorrectNum;
+
+            totalMarksObtained += score;
+            totalPossibleMarks += totalNum * 4;
+
+            performance[subject as SubjectName] = {
+                totalQuestions: totalNum,
+                correct: correctNum,
+                incorrect: incorrectNum,
+                skipped: skipped,
+                score: score,
+            };
+        }
+
         const analysis: TestPlanAnalysis = {
             notes,
-            marksObtained: Number(marksObtained),
-            totalMarks: Number(totalMarks),
+            marksObtained: totalMarksObtained,
+            totalMarks: totalPossibleMarks,
             rank: rank ? Number(rank) : undefined,
             percentile: percentile ? Number(percentile) : undefined,
-        }
+            testDuration: duration,
+            subjectWisePerformance: performance,
+        };
         onComplete(test.id, analysis);
-        // Reset form
-        setMarksObtained(''); setTotalMarks(''); setRank(''); setPercentile(''); setNotes('');
-        onClose();
     };
 
     if (!test) return null;
 
     return (
-        <Modal isOpen={!!test} onClose={onClose} title={`Analyze: ${test.name}`} maxWidth="max-w-lg">
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Marks Obtained</label>
-                        <Input type="number" value={marksObtained} onChange={e => setMarksObtained(e.target.value)} required />
-                    </div>
-                     <div>
-                        <label className="block text-sm font-medium mb-1">Total Marks</label>
-                        <Input type="number" value={totalMarks} onChange={e => setTotalMarks(e.target.value)} required />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Rank (Optional)</label>
-                        <Input type="number" value={rank} onChange={e => setRank(e.target.value)} />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Percentile (Optional)</label>
-                        <Input type="number" step="0.01" value={percentile} onChange={e => setPercentile(e.target.value)} />
-                    </div>
-                </div>
+        <Modal isOpen={!!test} onClose={onClose} title={`Analyze: ${test.name}`} maxWidth="max-w-3xl">
+            <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
-                    <label className="block text-sm font-medium mb-1">Analysis & Notes</label>
-                    <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4} className="w-full bg-slate-900/50 border border-brand-cyan-500/20 rounded-md px-3 py-2 text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-cyan-500 placeholder:text-gray-500" placeholder="e.g., Made silly mistakes in Physics..."></textarea>
+                    <h3 className="text-lg font-semibold text-brand-cyan-400 mb-3">Subject-wise Performance</h3>
+                    <div className="space-y-4">
+                        {(Object.keys(test.syllabus) as SubjectName[]).map(subject => (
+                            <div key={subject} className="p-3 bg-black/20 rounded-lg">
+                                <p className="font-bold mb-2">{subject}</p>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-medium mb-1">Total Questions</label>
+                                        <Input type="number" value={subjectData[subject]?.total || ''} onChange={e => handleSubjectDataChange(subject, 'total', e.target.value)} min="0" required />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium mb-1">Correct</label>
+                                        <Input type="number" value={subjectData[subject]?.correct || ''} onChange={e => handleSubjectDataChange(subject, 'correct', e.target.value)} min="0" required />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium mb-1">Incorrect</label>
+                                        <Input type="number" value={subjectData[subject]?.incorrect || ''} onChange={e => handleSubjectDataChange(subject, 'incorrect', e.target.value)} min="0" required />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
+
+                <div>
+                     <h3 className="text-lg font-semibold text-brand-cyan-400 mb-3">Additional Info</h3>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div>
+                            <label className="block text-sm font-medium mb-1">Rank (Optional)</label>
+                            <Input type="number" value={rank} onChange={e => setRank(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Percentile (Optional)</label>
+                            <Input type="number" step="0.01" value={percentile} onChange={e => setPercentile(e.target.value)} />
+                        </div>
+                        <div className="md:col-span-2">
+                             <label className="block text-sm font-medium mb-1">Analysis & Notes</label>
+                            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} className="w-full bg-slate-900/50 border border-brand-cyan-500/20 rounded-md px-3 py-2 text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-cyan-500 placeholder:text-gray-500" placeholder="e.g., Made silly mistakes in Physics..."></textarea>
+                        </div>
+                     </div>
+                </div>
+               
+                <TimeEditor initialDuration={duration} onDurationChange={setDuration} />
                 <div className="flex justify-end gap-2 mt-6">
                     <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
                     <Button type="submit" variant="primary">Save Analysis</Button>
@@ -193,293 +267,427 @@ const TestAnalysisModal: React.FC<{ test: TestPlan | null, onClose: () => void, 
     );
 };
 
-const ViewAnalysisModal: React.FC<{ test: TestPlan | null, onClose: () => void }> = ({ test, onClose }) => {
-    
-    const groupedTopics = useMemo(() => {
-        if (!test?.topicStatus) return {};
-        return test.topicStatus.reduce((acc, topic) => {
-            if (!acc[topic.subject]) acc[topic.subject] = {};
-            if (!acc[topic.subject][topic.chapter]) acc[topic.subject][topic.chapter] = [];
-            acc[topic.subject][topic.chapter].push(topic);
-            return acc;
-        }, {} as Record<SubjectName, Record<string, TopicStatus[]>>);
-    }, [test]);
-    
-    if (!test || !test.analysis) return null;
+const TimeAnalysis: React.FC<{ analysis: TestPlanAnalysis }> = ({ analysis }) => {
+    const { totalPrepTime, prepTimeByCategory, prepTimeBySubject, testDuration } = analysis;
 
-    const getAvgAccuracy = (attempts: TopicPracticeAttempt[]) => {
-        if (attempts.length === 0) return null;
-        const totalQ = attempts.reduce((sum, a) => sum + a.totalQuestions, 0);
-        const correctQ = attempts.reduce((sum, a) => sum + a.correctAnswers, 0);
-        return totalQ > 0 ? (correctQ / totalQ) * 100 : 0;
-    };
+    if ((!totalPrepTime || totalPrepTime <= 0) && (!testDuration || testDuration <= 0)) {
+        return null;
+    }
+
+    const subjectsWithTime = prepTimeBySubject ? (Object.keys(prepTimeBySubject) as SubjectName[]).filter(
+        subject => (prepTimeBySubject[subject]?.Revision || 0) > 0 || (prepTimeBySubject[subject]?.Practice || 0) > 0
+    ) : [];
 
     return (
-         <Modal isOpen={!!test} onClose={onClose} title={`Analysis: ${test.name}`} maxWidth="max-w-4xl">
-            <div className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                    <div className="p-2 bg-black/20 rounded-lg">
-                        <p className="text-xs text-gray-400">Score</p>
-                        <p className="text-lg font-bold text-brand-cyan-400">{test.analysis.marksObtained} / {test.analysis.totalMarks}</p>
-                    </div>
-                    <div className="p-2 bg-black/20 rounded-lg">
-                        <p className="text-xs text-gray-400">Percentage</p>
-                         <p className="text-lg font-bold text-brand-cyan-400">{test.analysis.totalMarks && test.analysis.marksObtained ? ((test.analysis.marksObtained / test.analysis.totalMarks) * 100).toFixed(2) : 'N/A'}%</p>
-                    </div>
-                    <div className="p-2 bg-black/20 rounded-lg">
-                        <p className="text-xs text-gray-400">Rank</p>
-                        <p className="text-lg font-bold text-brand-cyan-400">{test.analysis.rank ?? 'N/A'}</p>
-                    </div>
-                     <div className="p-2 bg-black/20 rounded-lg">
-                        <p className="text-xs text-gray-400">Percentile</p>
-                        <p className="text-lg font-bold text-brand-cyan-400">{test.analysis.percentile ?? 'N/A'}</p>
-                    </div>
-                </div>
-
-                {test.analysis.notes && (
-                    <div>
-                        <h4 className="font-semibold mb-2">Notes</h4>
-                        <p className="text-sm p-3 bg-black/20 rounded-md border-l-2 border-brand-cyan-700 whitespace-pre-wrap">{test.analysis.notes}</p>
+        <div className="p-3 bg-black/20 rounded-lg">
+            <h4 className="font-semibold mb-3 text-brand-cyan-400">Time Analysis</h4>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center mb-4">
+                {testDuration && testDuration > 0 && (
+                    <div className="p-2 bg-slate-900/50 rounded">
+                        <p className="text-xs text-gray-400">Test Duration</p>
+                        <p className="text-lg font-bold text-yellow-300 flex items-center justify-center gap-1"><TrophyIcon className="w-4 h-4" />{formatDuration(testDuration)}</p>
                     </div>
                 )}
-                
-                <div>
-                    <h4 className="font-semibold mb-2 mt-4">Preparation History</h4>
-                    <div className="space-y-4 max-h-80 overflow-y-auto bg-black/20 p-3 rounded-lg">
-                    {(Object.keys(groupedTopics) as SubjectName[]).map(subject => (
-                        <div key={subject}>
-                            <h5 className="font-bold text-brand-cyan-500">{subject}</h5>
-                             {Object.keys(groupedTopics[subject]).map(chapter => (
-                                <div key={chapter} className="pl-4 mt-2">
-                                    <p className="font-semibold text-sm text-gray-300 border-b border-white/10 pb-1 mb-1">{chapter}</p>
-                                    <ul className="text-xs space-y-1">
-                                    {groupedTopics[subject][chapter].map(topic => {
-                                        const avgAccuracy = getAvgAccuracy(topic.practiceAttempts);
-                                        return (
-                                            <li key={topic.microtopic} className="flex justify-between items-center">
-                                                <span>{topic.microtopic}</span>
-                                                <div className="flex items-center gap-4">
-                                                    <span>Rev. Diff: <span className="font-bold">{topic.revisionDifficulty ?? 'N/A'}</span></span>
-                                                    <span>Prac. Acc: <span className="font-bold">{avgAccuracy !== null ? `${avgAccuracy.toFixed(0)}%` : 'N/A'}</span></span>
-                                                </div>
-                                            </li>
-                                        )
-                                    })}
-                                    </ul>
-                                </div>
-                             ))}
+                {totalPrepTime && totalPrepTime > 0 && (
+                    <div className="p-2 bg-slate-900/50 rounded">
+                        <p className="text-xs text-gray-400">Total Prep Time</p>
+                        <p className="text-lg font-bold text-blue-300 flex items-center justify-center gap-1"><ClockIcon className="w-4 h-4" />{formatDuration(totalPrepTime)}</p>
+                    </div>
+                )}
+                {prepTimeByCategory && totalPrepTime && totalPrepTime > 0 && (
+                    <>
+                        <div className="p-2 bg-slate-900/50 rounded">
+                            <p className="text-xs text-gray-400">Revision Time</p>
+                            <p className="text-lg font-bold text-green-400 flex items-center justify-center gap-1"><RepeatIcon className="w-4 h-4" />{formatDuration(prepTimeByCategory.Revision)}</p>
                         </div>
-                    ))}
+                        <div className="p-2 bg-slate-900/50 rounded">
+                            <p className="text-xs text-gray-400">Practice Time</p>
+                            <p className="text-lg font-bold text-purple-400 flex items-center justify-center gap-1"><TargetIcon className="w-4 h-4" />{formatDuration(prepTimeByCategory.Practice)}</p>
+                        </div>
+                    </>
+                )}
+            </div>
+            
+            {subjectsWithTime.length > 0 && (
+                <div>
+                    <h5 className="font-semibold text-sm mb-2 text-gray-300">Prep Time per Subject:</h5>
+                    <div className="space-y-2">
+                        {subjectsWithTime.map(subject => {
+                            const revisionTime = prepTimeBySubject?.[subject]?.Revision || 0;
+                            const practiceTime = prepTimeBySubject?.[subject]?.Practice || 0;
+                            const totalSubjectTime = revisionTime + practiceTime;
+                            return (
+                                <div key={subject} className="p-2 bg-slate-900/50 rounded-md text-xs">
+                                    <p className="font-bold text-gray-200 mb-1">{subject}</p>
+                                    <div className="flex justify-around flex-wrap gap-x-4 gap-y-1">
+                                        <span className="flex items-center gap-1">Total: <strong className="text-blue-300">{formatDuration(totalSubjectTime)}</strong></span>
+                                        <span className="flex items-center gap-1">Revision: <strong className="text-green-300">{formatDuration(revisionTime)}</strong></span>
+                                        <span className="flex items-center gap-1">Practice: <strong className="text-purple-300">{formatDuration(practiceTime)}</strong></span>
+                                    </div>
+                                </div>
+                            )
+                        })}
                     </div>
                 </div>
+            )}
+        </div>
+    );
+};
 
-                 <div className="flex justify-end mt-6">
-                    <Button onClick={onClose} variant="secondary">Close</Button>
+const subjectTabs: { name: SubjectName, icon: React.FC<React.SVGProps<SVGSVGElement>> }[] = [
+    { name: 'Physics', icon: AtomIcon },
+    { name: 'Chemistry', icon: FlaskConicalIcon },
+    { name: 'Botany', icon: LeafIcon },
+    { name: 'Zoology', icon: DnaIcon },
+];
+
+const HistoricalProgressView: React.FC<{ progress: ProgressStats }> = ({ progress }) => {
+    const [activeTab, setActiveTab] = useState<SubjectName>('Physics');
+    const activeSubjectStats = progress.subjects[activeTab];
+
+    return (
+        <div className="p-4 bg-black/20 rounded-lg">
+            <div className="border-b border-white/20 mb-4">
+                <div className="flex space-x-1 overflow-x-auto">
+                    {subjectTabs.map(tab => (
+                        <button
+                            key={tab.name}
+                            onClick={() => setActiveTab(tab.name)}
+                            className={cn(
+                                "flex-shrink-0 flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors duration-300",
+                                activeTab === tab.name
+                                    ? 'bg-slate-900/50 text-brand-cyan-400 border-b-2 border-brand-cyan-400'
+                                    : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                            )}
+                        >
+                            <tab.icon className="w-5 h-5" />
+                            {tab.name}
+                        </button>
+                    ))}
                 </div>
+            </div>
+
+            {activeSubjectStats && (
+                <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead className="sticky top-0 bg-slate-900/80 backdrop-blur-sm z-10">
+                            <tr className="border-b border-white/20 text-xs uppercase text-gray-400">
+                                <th className="p-3">Topic</th>
+                                <th className="p-3 text-center">Tasks</th>
+                                <th className="p-3 text-center">Avg. Difficulty</th>
+                                <th className="p-3 text-center">Avg. Accuracy</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {(Object.entries(activeSubjectStats.chapters) as [string, ChapterStats][]).filter(([, data]) => data.completed > 0).map(([chapterName, chapterData]) => (
+                                <React.Fragment key={chapterName}>
+                                    <tr className="border-b border-white/10 bg-slate-900/30">
+                                        <td className="p-3 font-semibold">{chapterName}</td>
+                                        <td className="p-3 text-center">{chapterData.completed}</td>
+                                        <td className="p-3 text-center">{chapterData.avgDifficulty > 0 ? chapterData.avgDifficulty.toFixed(2) : 'N/A'}</td>
+                                        <td className="p-3 text-center">{chapterData.avgAccuracy !== null ? `${chapterData.avgAccuracy.toFixed(1)}%` : 'N/A'}</td>
+                                    </tr>
+                                    {(Object.entries(chapterData.microtopics) as [string, MicrotopicStats][]).filter(([, data]) => data.completed > 0).map(([microtopicName, microtopicData]) => (
+                                        <tr key={microtopicName} className="bg-black/20 text-gray-400">
+                                            <td className="py-2 px-3 pl-12 text-xs">{microtopicName}</td>
+                                            <td className="py-2 px-3 text-center">{microtopicData.completed}</td>
+                                            <td className="py-2 px-3 text-center">{microtopicData.avgDifficulty > 0 ? microtopicData.avgDifficulty.toFixed(2) : 'N/A'}</td>
+                                            <td className="py-2 px-3 text-center">{microtopicData.avgAccuracy !== null ? `${microtopicData.avgAccuracy.toFixed(1)}%` : 'N/A'}</td>
+                                        </tr>
+                                    ))}
+                                </React.Fragment>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const TestAnalysisDetails: React.FC<{ test: TestPlan }> = ({ test }) => {
+    if (!test.analysis) return null;
+
+    const analysis = test.analysis;
+    const performance = analysis.subjectWisePerformance || {};
+    const performanceSubjects = Object.keys(performance) as SubjectName[];
+
+    const totalRow = useMemo(() => {
+        if (!performance) return null;
+        return performanceSubjects.reduce((acc, subject) => {
+            const data = performance[subject];
+            if (data) {
+                acc.totalQuestions += data.totalQuestions;
+                acc.correct += data.correct;
+                acc.incorrect += data.incorrect;
+                acc.skipped += data.skipped;
+                acc.score += data.score;
+            }
+            return acc;
+        }, { totalQuestions: 0, correct: 0, incorrect: 0, skipped: 0, score: 0 });
+    }, [performance, performanceSubjects]);
+
+    const overallAccuracy = useMemo(() => {
+        if (!totalRow || totalRow.totalQuestions === 0) return 0;
+        return (totalRow.correct / totalRow.totalQuestions) * 100;
+    }, [totalRow]);
+    
+    return (
+         <div className="space-y-4 p-4 bg-black/20 rounded-b-lg animate-fadeIn">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 text-center">
+                <div className="p-2 bg-slate-900/50 rounded-lg">
+                    <p className="text-xs text-gray-400">Score</p>
+                    <p className="text-lg font-bold text-brand-cyan-400">{analysis.marksObtained} / {analysis.totalMarks}</p>
+                </div>
+                <div className="p-2 bg-slate-900/50 rounded-lg">
+                    <p className="text-xs text-gray-400">Percentage</p>
+                     <p className="text-lg font-bold text-brand-cyan-400">{analysis.totalMarks && analysis.marksObtained && analysis.totalMarks > 0 ? ((analysis.marksObtained / analysis.totalMarks) * 100).toFixed(2) : 'N/A'}%</p>
+                </div>
+                 <div className="p-2 bg-slate-900/50 rounded-lg">
+                    <p className="text-xs text-gray-400">Overall Accuracy</p>
+                    <p className="text-lg font-bold text-green-400">{overallAccuracy.toFixed(2)}%</p>
+                </div>
+                <div className="p-2 bg-slate-900/50 rounded-lg">
+                    <p className="text-xs text-gray-400">Rank</p>
+                    <p className="text-lg font-bold text-brand-cyan-400">{analysis.rank ?? 'N/A'}</p>
+                </div>
+                 <div className="p-2 bg-slate-900/50 rounded-lg">
+                    <p className="text-xs text-gray-400">Percentile</p>
+                    <p className="text-lg font-bold text-brand-cyan-400">{analysis.percentile ?? 'N/A'}</p>
+                </div>
+            </div>
+
+             <div>
+                <h4 className="font-semibold mb-2 mt-4">Subject-wise Performance</h4>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-900/80">
+                            <tr className="border-b border-white/20 text-xs uppercase text-gray-400">
+                                <th className="p-3">Subject</th>
+                                <th className="p-3 text-center">Score</th>
+                                <th className="p-3 text-center">Accuracy</th>
+                                <th className="p-3 text-center">Total Qs</th>
+                                <th className="p-3 text-center">Correct</th>
+                                <th className="p-3 text-center">Incorrect</th>
+                                <th className="p-3 text-center">Skipped</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {performanceSubjects.map(subject => {
+                                const data = performance[subject];
+                                if (!data) return null;
+                                const subjectMaxMarks = data.totalQuestions * 4;
+                                const subjectPercentage = subjectMaxMarks > 0 ? (data.score / subjectMaxMarks) * 100 : 0;
+                                const subjectAccuracy = data.totalQuestions > 0 ? (data.correct / data.totalQuestions) * 100 : 0;
+                                return (
+                                    <tr key={subject} className="border-b border-white/10">
+                                        <td className="p-3 font-semibold">{subject}</td>
+                                        <td className={cn("p-3 text-center font-mono", subjectPercentage < 40 ? 'text-red-400' : subjectPercentage < 75 ? 'text-yellow-400' : 'text-green-400')}>{data.score} / {subjectMaxMarks}</td>
+                                        <td className={cn("p-3 text-center font-mono", subjectAccuracy < 50 ? 'text-red-400' : subjectAccuracy < 80 ? 'text-yellow-400' : 'text-green-400')}>{subjectAccuracy.toFixed(2)}%</td>
+                                        <td className="p-3 text-center">{data.totalQuestions}</td>
+                                        <td className="p-3 text-center text-green-400">{data.correct}</td>
+                                        <td className="p-3 text-center text-red-400">{data.incorrect}</td>
+                                        <td className="p-3 text-center text-gray-400">{data.skipped}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                        {totalRow && (
+                            <tfoot className="font-bold bg-slate-900/80 text-gray-200">
+                                <tr>
+                                    <td className="p-3">Total</td>
+                                    <td className="p-3 text-center font-mono">{totalRow.score} / {analysis.totalMarks}</td>
+                                    <td className={cn("p-3 text-center font-mono", overallAccuracy < 50 ? 'text-red-300' : overallAccuracy < 80 ? 'text-yellow-300' : 'text-green-300')}>{overallAccuracy.toFixed(2)}%</td>
+                                    <td className="p-3 text-center">{totalRow.totalQuestions}</td>
+                                    <td className="p-3 text-center text-green-300">{totalRow.correct}</td>
+                                    <td className="p-3 text-center text-red-300">{totalRow.incorrect}</td>
+                                    <td className="p-3 text-center text-gray-300">{totalRow.skipped}</td>
+                                </tr>
+                            </tfoot>
+                        )}
+                    </table>
+                </div>
+            </div>
+
+            <TimeAnalysis analysis={analysis} />
+
+            {analysis.notes && (
+                <div>
+                    <h4 className="font-semibold mb-2">Notes</h4>
+                    <p className="text-sm p-3 bg-black/20 rounded-md border-l-2 border-brand-cyan-700 whitespace-pre-wrap">{analysis.notes}</p>
+                </div>
+            )}
+            
+            {analysis.progressSnapshot && (
+                <div className="mt-4">
+                    <h4 className="font-semibold mb-2">Preparation Status at Time of Test</h4>
+                    <HistoricalProgressView progress={analysis.progressSnapshot} />
+                </div>
+            )}
+        </div>
+    );
+}
+
+const ViewAnalysisModal: React.FC<{ test: TestPlan | null, onClose: () => void }> = ({ test, onClose }) => {
+    if (!test || !test.analysis) return null;
+    return (
+         <Modal isOpen={!!test} onClose={onClose} title={`Analysis: ${test.name}`} maxWidth="max-w-4xl">
+            <TestAnalysisDetails test={test} />
+            <div className="flex justify-end mt-6">
+                <Button onClick={onClose} variant="secondary">Close</Button>
             </div>
         </Modal>
     );
 }
 
-const LogRevisionModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (difficulty: number) => void; topicName: string; }> = ({ isOpen, onClose, onSave, topicName }) => {
-    const [difficulty, setDifficulty] = useState(3);
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        onSave(difficulty);
-        onClose();
-    };
 
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`Revise: ${topicName}`} maxWidth="max-w-md">
-            <form onSubmit={handleSubmit}>
-                <label className="block mb-2">How difficult was this topic? (1: Easy - 5: Hard)</label>
-                <div className="flex items-center gap-4 my-4">
-                    <span>1</span>
-                    <input type="range" min="1" max="5" value={difficulty} onChange={e => setDifficulty(Number(e.target.value))} className="w-full" />
-                    <span>5</span>
-                    <span className="font-bold text-brand-cyan-400 w-4">{difficulty}</span>
-                </div>
-                <div className="flex justify-end gap-2 mt-6">
-                    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button type="submit" variant="primary">Save</Button>
-                </div>
-            </form>
-        </Modal>
-    );
-};
-
-const LogPracticeModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (total: number, correct: number) => void; topicName: string; }> = ({ isOpen, onClose, onSave, topicName }) => {
-    const [total, setTotal] = useState('');
-    const [correct, setCorrect] = useState('');
-    
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const totalNum = Number(total);
-        const correctNum = Number(correct);
-        if (totalNum > 0 && correctNum <= totalNum && correctNum >= 0) {
-            onSave(totalNum, correctNum);
-            onClose();
-        }
-    };
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`Practice: ${topicName}`} maxWidth="max-w-md">
-             <form onSubmit={handleSubmit}>
-                <div className="space-y-4">
-                    <div>
-                        <label className="block mb-1">Total Questions Attempted</label>
-                        <Input type="number" value={total} onChange={e => setTotal(e.target.value)} min="1" required />
-                    </div>
-                    <div>
-                        <label className="block mb-1">Number of Correct Answers</label>
-                        <Input type="number" value={correct} onChange={e => setCorrect(e.target.value)} min="0" max={total || undefined} required />
-                    </div>
-                </div>
-                <div className="flex justify-end gap-2 mt-6">
-                    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button type="submit" variant="primary">Save</Button>
-                </div>
-            </form>
-        </Modal>
-    );
-};
+interface TestPlannerProps {
+    tasks: Task[];
+    setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
+    testPlans: TestPlan[];
+    setTestPlans: React.Dispatch<React.SetStateAction<TestPlan[]>>;
+    activeTimer: ActiveTimer | null;
+    startPrepTimer: (task: Task) => void;
+    startTestTimer: (test: TestPlan) => void;
+    completedTestInfo: { test: TestPlan, duration: number } | null;
+    onAnalysisComplete: () => void;
+}
 
 
-const TestPlanner: React.FC = () => {
-    const [tests, setTests] = useLocalStorage<TestPlan[]>('testPlans', []);
-    const [tasks, setTasks] = useLocalStorage<Task[]>('tasks', []);
+const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, setTasks, testPlans, setTestPlans, activeTimer, startPrepTimer, startTestTimer, completedTestInfo, onAnalysisComplete }) => {
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
     const [testToAnalyze, setTestToAnalyze] = useState<TestPlan | null>(null);
     const [viewingTest, setViewingTest] = useState<TestPlan | null>(null);
     const [expandedTest, setExpandedTest] = useState<string | null>(null);
+    const [expandedCompletedTest, setExpandedCompletedTest] = useState<string | null>(null);
+    const [initialDurationForAnalysis, setInitialDurationForAnalysis] = useState(0);
 
-    // State for logging revision/practice
-    const [isRevisionModalOpen, setRevisionModalOpen] = useState(false);
-    const [isPracticeModalOpen, setPracticeModalOpen] = useState(false);
-    const [topicToUpdate, setTopicToUpdate] = useState<TopicStatus | null>(null);
-    const [currentTestId, setCurrentTestId] = useState<string | null>(null);
-    
+    useEffect(() => {
+        if (completedTestInfo) {
+            setTestToAnalyze(completedTestInfo.test);
+            setInitialDurationForAnalysis(completedTestInfo.duration);
+        }
+    }, [completedTestInfo]);
+
     const progressStats = useMemo(() => calculateProgress(tasks), [tasks]);
     
-    const calculateOverallScore = (avgDifficulty: number, avgAccuracy: number | null): number => {
-        const hasDifficulty = avgDifficulty > 0;
-        const hasAccuracy = avgAccuracy !== null;
-
-        if (hasDifficulty && hasAccuracy) {
-            const normalizedDifficultyScore = ((5 - avgDifficulty) / 4) * 100;
-            return (normalizedDifficultyScore * 0.35) + (avgAccuracy * 0.65);
-        } else if (hasDifficulty) {
-            return ((5 - avgDifficulty) / 4) * 100;
-        } else if (hasAccuracy) {
-            return avgAccuracy;
-        }
-        return 0;
-    }
-    
-    const getScoreColorClass = (score: number) => {
-        if (score <= 40) return 'text-red-400';
-        if (score <= 79) return 'text-yellow-400';
-        return 'text-green-400';
-    }
-
-    const addTest = (testData: Omit<TestPlan, 'id'|'status'>) => {
-        const newTest: TestPlan = { ...testData, id: crypto.randomUUID(), status: 'Upcoming' };
-        setTests(prev => [...prev, newTest].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
-    };
-
-    const deleteTest = (id: string) => {
-        if (window.confirm('Are you sure you want to delete this test plan?')) {
-            setTests(tests.filter(t => t.id !== id));
-        }
-    };
-    
-    const completeTest = (id: string, analysis: TestPlanAnalysis) => {
-        setTests(tests.map(t => t.id === id ? { ...t, status: 'Completed', analysis } : t));
-    };
-
-    const handleSaveRevision = (difficulty: number) => {
-        if (!currentTestId || !topicToUpdate) return;
-        
-        let currentTestName = '';
-        setTests(prevTests => prevTests.map(test => {
-            if (test.id !== currentTestId) return test;
-            currentTestName = test.name;
-            const updatedTopicStatus = test.topicStatus.map(topic => 
-                topic.microtopic === topicToUpdate.microtopic && topic.chapter === topicToUpdate.chapter ? { ...topic, revisionDifficulty: difficulty } : topic
-            );
-            return { ...test, topicStatus: updatedTopicStatus };
-        }));
-
-        const performanceSummary = generatePerformanceSummary(difficulty, undefined, undefined);
-        const notes = `Auto-generated from test preparation for "${currentTestName}".` + performanceSummary;
-
-        const newTask: Task = {
-            id: crypto.randomUUID(),
-            name: `Revise: ${topicToUpdate.microtopic}`,
-            subject: topicToUpdate.subject,
-            chapter: topicToUpdate.chapter,
-            microtopics: [topicToUpdate.microtopic],
-            taskType: 'Revision',
-            date: new Date().toISOString().split('T')[0],
-            status: 'Completed',
-            priority: 'High',
-            notes: notes,
-            difficulty: difficulty,
-        };
-        setTasks(prevTasks => [...prevTasks, newTask].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
-    };
-
-    const handleSavePractice = (total: number, correct: number) => {
-        if (!currentTestId || !topicToUpdate) return;
-        
-        let currentTestName = '';
-        setTests(prevTests => prevTests.map(test => {
-            if (test.id !== currentTestId) return test;
-            currentTestName = test.name;
-            const updatedTopicStatus = test.topicStatus.map(topic => {
-                if (topic.microtopic !== topicToUpdate.microtopic || topic.chapter !== topicToUpdate.chapter) return topic;
-                const newAttempt: TopicPracticeAttempt = { id: crypto.randomUUID(), totalQuestions: total, correctAnswers: correct };
-                return { ...topic, practiceAttempts: [...topic.practiceAttempts, newAttempt] };
-            });
-            return { ...test, topicStatus: updatedTopicStatus };
-        }));
-        
-        const performanceSummary = generatePerformanceSummary(undefined, total, correct);
-        const notes = `Auto-generated from test preparation for "${currentTestName}".` + performanceSummary;
-
-        const newTask: Task = {
-            id: crypto.randomUUID(),
-            name: `Practice: ${topicToUpdate.microtopic}`,
-            subject: topicToUpdate.subject,
-            chapter: topicToUpdate.chapter,
-            microtopics: [topicToUpdate.microtopic],
-            taskType: 'Practice',
-            date: new Date().toISOString().split('T')[0],
-            status: 'Completed',
-            priority: 'High',
-            notes: notes,
-            totalQuestions: total,
-            correctAnswers: correct,
-        };
-        setTasks(prevTasks => [...prevTasks, newTask].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
-    };
-
     const { upcomingTests, completedTests } = useMemo(() => {
         const upcoming: TestPlan[] = [];
         const completed: TestPlan[] = [];
-        tests.forEach(test => {
+        testPlans.forEach(test => {
             if (test.status === 'Upcoming') upcoming.push(test);
             else completed.push(test);
         });
         return { upcomingTests: upcoming, completedTests: completed.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) };
-    }, [tests]);
+    }, [testPlans]);
+    
+    const detailedPrepTimes = useMemo(() => {
+        const details: { [testId: string]: {
+            total: number;
+            byCategory: { Revision: number; Practice: number; };
+            bySubject: { [key in SubjectName]?: { Revision: number; Practice: number; } };
+        } } = {};
 
-    const getAvgAccuracy = (attempts: TopicPracticeAttempt[]) => {
-        if (attempts.length === 0) return null;
-        const totalQ = attempts.reduce((sum, a) => sum + a.totalQuestions, 0);
-        const correctQ = attempts.reduce((sum, a) => sum + a.correctAnswers, 0);
-        return totalQ > 0 ? (correctQ / totalQ) * 100 : 0;
+        upcomingTests.forEach(test => {
+            const testPrepTasks = tasks.filter(task => 
+                task.status === 'Completed' && 
+                task.notes?.includes(`For upcoming test: "${test.name}"`)
+            );
+
+            const testDetails = testPrepTasks.reduce((acc, task) => {
+                if (task.taskType === 'Revision' || task.taskType === 'Practice') {
+                    const duration = (task.sessions || []).reduce((sum, s) => sum + s.duration, 0);
+                    
+                    acc.total += duration;
+                    acc.byCategory[task.taskType] += duration;
+                    
+                    if (!acc.bySubject[task.subject]) {
+                        acc.bySubject[task.subject] = { Revision: 0, Practice: 0 };
+                    }
+                    acc.bySubject[task.subject]![task.taskType] += duration;
+                }
+                return acc;
+            }, {
+                total: 0,
+                byCategory: { Revision: 0, Practice: 0 },
+                bySubject: {} as { [key in SubjectName]?: { Revision: number; Practice: number; } }
+            });
+
+            details[test.id] = testDetails;
+        });
+
+        return details;
+    }, [tasks, upcomingTests]);
+
+    const addTest = (testData: Omit<TestPlan, 'id'|'status'>) => {
+        const newTest: TestPlan = { ...testData, id: crypto.randomUUID(), status: 'Upcoming' };
+        setTestPlans(prev => [...prev, newTest].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
     };
 
+    const deleteTest = (id: string) => {
+        if (window.confirm('Are you sure you want to delete this test plan?')) {
+            setTestPlans(testPlans.filter(t => t.id !== id));
+        }
+    };
+    
+    const completeTest = (id: string, analysis: TestPlanAnalysis) => {
+        const testBeingCompleted = testPlans.find(t => t.id === id);
+        if (!testBeingCompleted) return;
+        
+        const tasksForSnapshot = tasks.filter(task => 
+            task.status === 'Completed' && new Date(task.date) <= new Date(testBeingCompleted.date)
+        );
+    
+        const progressSnapshot = calculateProgress(tasksForSnapshot);
+
+        const prepData = detailedPrepTimes[id];
+        const analysisWithTime: TestPlanAnalysis = { 
+            ...analysis, 
+            totalPrepTime: prepData?.total || 0,
+            prepTimeByCategory: prepData?.byCategory,
+            prepTimeBySubject: prepData?.bySubject,
+            progressSnapshot: progressSnapshot
+        };
+        const updatedTest = { ...testBeingCompleted, status: 'Completed' as const, analysis: analysisWithTime };
+        setTestPlans(testPlans.map(t => t.id === id ? updatedTest : t));
+        setTestToAnalyze(null);
+        onAnalysisComplete();
+        setViewingTest(updatedTest); // Immediately show the analysis view in a modal
+    };
+    
+    const handleStartRevisionTimer = (test: TestPlan, topic: TopicStatus) => {
+        const newTask: Task = {
+            id: crypto.randomUUID(),
+            name: `Revise: ${topic.microtopic}`,
+            subject: topic.subject,
+            chapter: topic.chapter,
+            microtopics: [topic.microtopic],
+            taskType: 'Revision',
+            date: new Date().toISOString().split('T')[0],
+            status: 'Pending',
+            priority: 'High',
+            notes: `For upcoming test: "${test.name}"`,
+            sessions: [],
+        };
+        startPrepTimer(newTask);
+    };
+
+    const handleStartPracticeTimer = (test: TestPlan, topic: TopicStatus) => {
+        const newTask: Task = {
+            id: crypto.randomUUID(),
+            name: `Practice: ${topic.microtopic}`,
+            subject: topic.subject,
+            chapter: topic.chapter,
+            microtopics: [topic.microtopic],
+            taskType: 'Practice',
+            date: new Date().toISOString().split('T')[0],
+            status: 'Pending',
+            priority: 'High',
+            notes: `For upcoming test: "${test.name}"`,
+            sessions: [],
+        };
+        startPrepTimer(newTask);
+    };
 
     return (
         <div>
@@ -498,17 +706,23 @@ const TestPlanner: React.FC = () => {
                                     <div>
                                         <p className="font-semibold">{test.name}</p>
                                         <p className="text-sm text-gray-400">{new Date(new Date(test.date).toLocaleString("en-US", { timeZone: "UTC" })).toDateString()}</p>
+                                        {(detailedPrepTimes[test.id]?.total || 0) > 0 && (
+                                            <div className="flex items-center gap-1.5 mt-1 text-xs text-blue-300">
+                                                <ClockIcon className="w-4 h-4" />
+                                                <span>Total Prep Time: {formatDuration(detailedPrepTimes[test.id].total)}</span>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-2 self-end sm:self-center">
+                                        <Button onClick={() => startTestTimer(test)} variant="primary" size="sm" disabled={!!activeTimer}><TrophyIcon className="w-4 h-4"/>Start Test</Button>
                                         <Button onClick={() => setExpandedTest(expandedTest === test.id ? null : test.id)} variant="secondary" size="sm">
                                             {expandedTest === test.id ? 'Hide Prep' : 'Start Prep'}
                                         </Button>
-                                        <Button onClick={() => setTestToAnalyze(test)} variant="secondary" size="sm">Mark as Complete</Button>
                                         <button onClick={() => deleteTest(test.id)} className="p-1 text-gray-400 hover:text-red-400 transition-colors"><Trash2Icon className="w-4 h-4" /></button>
                                     </div>
                                 </div>
                                 {expandedTest === test.id && (
-                                    <div className="w-full bg-black/20 p-4 rounded-lg max-h-[70vh] overflow-y-auto space-y-6">
+                                    <div className="w-full bg-black/20 p-4 rounded-lg max-h-[70vh] overflow-y-auto space-y-6 animate-fadeIn">
                                         <div>
                                             <h4 className="font-semibold text-brand-cyan-500 mb-2">AI-Powered Topic Analysis</h4>
                                             {(() => {
@@ -523,10 +737,9 @@ const TestPlanner: React.FC = () => {
                                                 <table className="w-full text-xs">
                                                     <thead className="sticky top-0 bg-slate-900/70 backdrop-blur-sm z-20">
                                                         <tr className="text-left text-gray-400 border-b border-white/20">
-                                                            <th className="py-2 px-3 w-2/5">Topic</th>
-                                                            <th className="py-2 px-3 text-center w-1/5">Daily Performance</th>
-                                                            <th className="py-2 px-3 text-center w-1/5">Test Revision</th>
-                                                            <th className="py-2 px-3 text-center w-1/5">Test Practice</th>
+                                                            <th className="py-2 px-3 w-1/2">Topic</th>
+                                                            <th className="py-2 px-3 text-center w-1/4">Prep. Status</th>
+                                                            <th className="py-2 px-3 text-center w-1/4">Actions</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -541,19 +754,18 @@ const TestPlanner: React.FC = () => {
                                                         return (Object.keys(groupedTopics) as SubjectName[]).map(subject => (
                                                             <React.Fragment key={subject}>
                                                                 <tr className="bg-brand-cyan-900/50 backdrop-blur-sm sticky top-9 z-10">
-                                                                    <th colSpan={4} className="py-2 px-3 text-left font-bold text-brand-cyan-400 text-sm uppercase tracking-wider">
+                                                                    <th colSpan={3} className="py-2 px-3 text-left font-bold text-brand-cyan-400 text-sm uppercase tracking-wider">
                                                                         {subject}
                                                                     </th>
                                                                 </tr>
                                                                 {Object.keys(groupedTopics[subject]).map(chapter => (
                                                                     <React.Fragment key={chapter}>
                                                                         <tr className="bg-black/40">
-                                                                            <td colSpan={4} className="py-1.5 px-3 font-semibold text-gray-300 pl-6">
+                                                                            <td colSpan={3} className="py-1.5 px-3 font-semibold text-gray-300 pl-6">
                                                                                 {chapter}
                                                                             </td>
                                                                         </tr>
                                                                         {groupedTopics[subject][chapter].map(topic => {
-                                                                            const avgAccuracy = getAvgAccuracy(topic.practiceAttempts);
                                                                             const dailyStats = progressStats.subjects[topic.subject]
                                                                                 ?.chapters[topic.chapter]
                                                                                 ?.microtopics[topic.microtopic];
@@ -565,29 +777,37 @@ const TestPlanner: React.FC = () => {
                                                                             return (
                                                                                 <tr key={topic.microtopic} className="border-b border-white/10 hover:bg-white/5">
                                                                                     <td className={cn("py-1.5 px-3 pl-8", dailyScore !== undefined && getScoreColorClass(dailyScore))}>{topic.microtopic}</td>
-                                                                                    <td className="py-1.5 text-center">
-                                                                                        {dailyScore !== undefined ? (
-                                                                                            <div className={getScoreColorClass(dailyScore)}>
-                                                                                                <span className="block font-semibold">Score: {dailyScore.toFixed(0)}</span>
+                                                                                    <td className="py-1.5 px-3 text-center">
+                                                                                         {topic.revisionDifficulty || topic.practiceAttempts.length > 0 ? (
+                                                                                            <div className="text-xs space-y-1">
+                                                                                                {topic.revisionDifficulty && (
+                                                                                                    <span className="flex items-center justify-center gap-1 text-green-300">
+                                                                                                        <BrainIcon className="w-3 h-3"/> Revised (Diff: <strong>{topic.revisionDifficulty}</strong>/5)
+                                                                                                    </span>
+                                                                                                )}
+                                                                                                {topic.practiceAttempts.map(attempt => {
+                                                                                                    const accuracy = attempt.totalQuestions > 0 ? (attempt.correctAnswers / attempt.totalQuestions) * 100 : 0;
+                                                                                                    return (
+                                                                                                        <span key={attempt.id} className="flex items-center justify-center gap-1 text-purple-300">
+                                                                                                            <ClipboardCheckIcon className="w-3 h-3" /> Practiced: <strong>{accuracy.toFixed(0)}%</strong> ({attempt.correctAnswers}/{attempt.totalQuestions})
+                                                                                                        </span>
+                                                                                                    );
+                                                                                                })}
                                                                                             </div>
                                                                                         ) : (
-                                                                                            <span className="text-gray-500">No Data</span>
+                                                                                            <div className="text-xs text-gray-500">
+                                                                                                <p>Overall Score:</p>
+                                                                                                <p className={cn("font-bold", dailyScore !== undefined && getScoreColorClass(dailyScore))}>
+                                                                                                    {dailyScore !== undefined ? `${dailyScore.toFixed(0)}/100` : 'No Data'}
+                                                                                                </p>
+                                                                                            </div>
                                                                                         )}
                                                                                     </td>
-                                                                                    <td className="py-1.5 text-center">
-                                                                                        {topic.revisionDifficulty ? (
-                                                                                            <span className="font-bold">Diff: {topic.revisionDifficulty}/5</span>
-                                                                                        ) : (
-                                                                                            <Button variant="ghost" size="sm" onClick={() => { setCurrentTestId(test.id); setTopicToUpdate(topic); setRevisionModalOpen(true); }}><BrainIcon className="w-4 h-4 mr-1"/>Revise</Button>
-                                                                                        )}
-                                                                                    </td>
-                                                                                    <td className="py-1.5 text-center">
-                                                                                        {avgAccuracy !== null && (
-                                                                                            <span className={cn('font-bold block mb-1', avgAccuracy >= 80 ? 'text-green-400' : avgAccuracy >= 50 ? 'text-yellow-400' : 'text-red-400')}>
-                                                                                                Acc: {avgAccuracy?.toFixed(0) ?? 'N/A'}%
-                                                                                            </span>
-                                                                                        )}
-                                                                                        <Button variant="ghost" size="sm" onClick={() => { setCurrentTestId(test.id); setTopicToUpdate(topic); setPracticeModalOpen(true); }}><ClipboardCheckIcon className="w-4 h-4 mr-1"/>Practice</Button>
+                                                                                    <td className="py-1.5 px-3 text-center">
+                                                                                        <div className="flex justify-center items-center gap-1">
+                                                                                            <Button variant="ghost" size="sm" onClick={() => handleStartRevisionTimer(test, topic)} disabled={!!activeTimer}><BrainIcon className="w-4 h-4 mr-1"/>Revise</Button>
+                                                                                            <Button variant="ghost" size="sm" onClick={() => handleStartPracticeTimer(test, topic)} disabled={!!activeTimer}><ClipboardCheckIcon className="w-4 h-4 mr-1"/>Practice</Button>
+                                                                                        </div>
                                                                                     </td>
                                                                                 </tr>
                                                                             );
@@ -613,39 +833,50 @@ const TestPlanner: React.FC = () => {
                 <h2 className="text-2xl font-bold text-brand-cyan-400 mb-4">Completed Tests</h2>
                 {completedTests.length > 0 ? (
                     <div className="space-y-4">
-                         {completedTests.map(test => (
-                            <Card key={test.id} className="p-4">
-                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                                    <div>
-                                        <p className="font-semibold">{test.name} - <span className="text-brand-cyan-400 font-bold">{test.analysis?.marksObtained} / {test.analysis?.totalMarks}</span></p>
-                                        <p className="text-sm text-gray-400">{new Date(new Date(test.date).toLocaleString("en-US", { timeZone: "UTC" })).toDateString()}</p>
+                         {completedTests.map(test => {
+                            const isExpanded = expandedCompletedTest === test.id;
+                            const percentage = test.analysis?.totalMarks && test.analysis.marksObtained && test.analysis.totalMarks > 0 ? ((test.analysis.marksObtained / test.analysis.totalMarks) * 100) : 0;
+                            return (
+                                <Card key={test.id} className="p-0 overflow-hidden">
+                                    <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 cursor-pointer hover:bg-white/5" onClick={() => setExpandedCompletedTest(isExpanded ? null : test.id)}>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-semibold">{test.name}</p>
+                                            <p className="text-sm text-gray-400">{new Date(new Date(test.date).toLocaleString("en-US", { timeZone: "UTC" })).toDateString()}</p>
+                                            {test.analysis?.totalPrepTime && test.analysis.totalPrepTime > 0 ? (
+                                                <div className="flex items-center gap-1.5 mt-1 text-xs text-blue-300">
+                                                    <ClockIcon className="w-4 h-4" />
+                                                    <span>Total Prep Time: {formatDuration(test.analysis.totalPrepTime)}</span>
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                        <div className="flex items-center gap-4 self-end sm:self-center">
+                                             <div className="text-right">
+                                                <p className="text-2xl font-bold text-brand-cyan-400">{test.analysis?.marksObtained} / {test.analysis?.totalMarks}</p>
+                                                <p className={cn("text-sm font-semibold", getScoreColorClass(percentage))}>{percentage.toFixed(2)}%</p>
+                                             </div>
+                                            <button onClick={(e) => { e.stopPropagation(); deleteTest(test.id) }} className="p-2 text-gray-400 hover:text-red-400 transition-colors"><Trash2Icon className="w-5 h-5" /></button>
+                                             <ChevronDownIcon className={cn("w-6 h-6 text-gray-400 transition-transform", isExpanded && "rotate-180")} />
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2 self-end sm:self-center">
-                                        <Button onClick={() => setViewingTest(test)} variant="secondary" size="sm">View Analysis</Button>
-                                        <button onClick={() => deleteTest(test.id)} className="p-1 text-gray-400 hover:text-red-400 transition-colors"><Trash2Icon className="w-4 h-4" /></button>
-                                    </div>
-                                </div>
-                            </Card>
-                        ))}
+                                    {isExpanded && <TestAnalysisDetails test={test} />}
+                                </Card>
+                            )
+                        })}
                     </div>
                 ) : <Card className="p-6 text-center text-gray-400">You haven't completed any tests yet.</Card>}
             </section>
             
-            <CreateTestModal isOpen={isCreateModalOpen} onClose={() => setCreateModalOpen(false)} onAddTest={addTest} />
-            <TestAnalysisModal test={testToAnalyze} onClose={() => setTestToAnalyze(null)} onComplete={completeTest} />
+            <CreateTestModal isOpen={isCreateModalOpen} onClose={() => setCreateModalOpen(false)} onAddTest={addTest} tasks={tasks} />
+            <TestAnalysisModal 
+                test={testToAnalyze}
+                initialDuration={initialDurationForAnalysis}
+                onClose={() => {
+                    setTestToAnalyze(null);
+                    onAnalysisComplete();
+                }}
+                onComplete={completeTest} 
+            />
             <ViewAnalysisModal test={viewingTest} onClose={() => setViewingTest(null)} />
-            <LogRevisionModal 
-                isOpen={isRevisionModalOpen} 
-                onClose={() => { setRevisionModalOpen(false); setTopicToUpdate(null); }}
-                topicName={topicToUpdate?.microtopic || ''}
-                onSave={handleSaveRevision}
-            />
-            <LogPracticeModal 
-                isOpen={isPracticeModalOpen} 
-                onClose={() => { setPracticeModalOpen(false); setTopicToUpdate(null); }}
-                topicName={topicToUpdate?.microtopic || ''}
-                onSave={handleSavePractice}
-            />
         </div>
     );
 };

@@ -1,8 +1,14 @@
+// Fix: Removed self-import of `SubjectName` and `TaskType` which conflicted with local declarations.
 export type SubjectName = 'Physics' | 'Chemistry' | 'Botany' | 'Zoology';
 export type TaskType = 'Study' | 'Revision' | 'Practice';
 export type TaskStatus = 'Pending' | 'Completed';
 export type Theme = 'light' | 'dark';
 export type Priority = 'Low' | 'Medium' | 'High';
+
+export interface StudySession {
+  date: string; // ISO string
+  duration: number; // in seconds
+}
 
 export interface Task {
   id: string;
@@ -17,8 +23,10 @@ export interface Task {
   difficulty?: number; // 1-5
   totalQuestions?: number;
   correctAnswers?: number;
+  incorrectAnswers?: number;
   notes?: string;
   originalDate?: string;
+  sessions: StudySession[];
 }
 
 export type Syllabus = {
@@ -35,6 +43,11 @@ export interface MicrotopicStats {
   avgAccuracy: number | null;
   difficulties: number[];
   accuracies: number[];
+  totalTime: number;
+  totalQuestions: number;
+  totalCorrect: number;
+  totalIncorrect: number;
+  totalSkipped: number;
 }
 
 export interface ChapterStats {
@@ -48,6 +61,11 @@ export interface ChapterStats {
   microtopics: {
     [microtopic: string]: MicrotopicStats;
   };
+  totalTime: number;
+  totalQuestions: number;
+  totalCorrect: number;
+  totalIncorrect: number;
+  totalSkipped: number;
 }
 
 export interface SubjectStats {
@@ -61,6 +79,14 @@ export interface SubjectStats {
   chapters: {
     [chapter: string]: ChapterStats;
   };
+  totalTime: number;
+  timeByCategory: {
+    [key in TaskType]: number;
+  };
+  totalQuestions: number;
+  totalCorrect: number;
+  totalIncorrect: number;
+  totalSkipped: number;
 }
 
 export interface ProgressStats {
@@ -70,22 +96,57 @@ export interface ProgressStats {
   subjects: {
     [key in SubjectName]: SubjectStats;
   };
+  totalTimeStudied: number;
+  timeByCategory: {
+    [key in TaskType]: number;
+  };
+  totalQuestions: number;
+  totalCorrect: number;
+  totalIncorrect: number;
+  totalSkipped: number;
 }
 
 // Test Planner Types
+export interface SubjectTestPerformance {
+  totalQuestions: number;
+  correct: number;
+  incorrect: number;
+  skipped: number;
+  score: number;
+}
+
 export interface TestPlanAnalysis {
   score?: number; // Kept for backward compatibility if needed, but replaced by marksObtained
   notes: string;
-  totalMarks?: number;
-  marksObtained?: number;
+  totalMarks?: number; // This will now be total *possible* marks
+  marksObtained?: number; // This will be the calculated score
   rank?: number;
   percentile?: number;
+  totalPrepTime?: number; // in seconds
+  prepTimeByCategory?: {
+    Revision: number;
+    Practice: number;
+  };
+  prepTimeBySubject?: {
+    [key in SubjectName]?: {
+      Revision: number;
+      Practice: number;
+    };
+  };
+  testDuration?: number; // in seconds
+  subjectWisePerformance?: {
+    [key in SubjectName]?: SubjectTestPerformance;
+  };
+  progressSnapshot?: ProgressStats;
 }
+
 
 export interface TopicPracticeAttempt {
   id: string;
   totalQuestions: number;
   correctAnswers: number;
+  incorrectAnswers: number;
+  duration: number; // in seconds
 }
 
 export interface TopicStatus {
@@ -117,4 +178,13 @@ export interface AnalyzedTopic {
   avgAccuracy: number | null;
   tasksCompleted: number;
   overallScore: number;
+}
+
+// Timer type
+export interface ActiveTimer {
+    task?: Task;
+    test?: TestPlan;
+    startTime: number;
+    elapsedTime: number; // Time in ms, accumulated during pauses
+    isPaused: boolean;
 }

@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Task, TaskType, SubjectName, TestPlan, Priority, TaskStatus } from '../types';
+import { Task, TaskType, SubjectName, TestPlan, Priority, TaskStatus, ActiveTimer } from '../types';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { syllabus } from '../data/syllabus';
-import { cn, generatePerformanceSummary } from '../lib/utils';
-import { PlusIcon, BookOpenIcon, RepeatIcon, TargetIcon, Trash2Icon, TrophyIcon, ClockIcon, PencilIcon, ChevronLeftIcon, ChevronRightIcon, FilterIcon, CalendarPlusIcon, StickyNoteIcon, ChevronDownIcon } from './ui/Icons';
+import { cn, formatDuration } from '../lib/utils';
+import { PlusIcon, BookOpenIcon, RepeatIcon, TargetIcon, Trash2Icon, TrophyIcon, ClockIcon, PencilIcon, ChevronLeftIcon, ChevronRightIcon, FilterIcon, CalendarPlusIcon, StickyNoteIcon, ChevronDownIcon, PlayIcon } from './ui/Icons';
 import { Card, Button, Select, Input, Textarea, Modal } from './ui/StyledComponents';
 
 // --- Calendar Component ---
@@ -90,7 +90,7 @@ const Calendar: React.FC<{
 // --- TaskForm Component ---
 
 const TaskForm: React.FC<{
-    onAddTask: (task: Omit<Task, 'id' | 'status'>) => void;
+    onAddTask: (task: Omit<Task, 'id' | 'status' | 'sessions'>) => void;
     selectedDate: Date;
     onDateChange: (date: Date) => void;
 }> = ({ onAddTask, selectedDate, onDateChange }) => {
@@ -260,22 +260,42 @@ const PriorityBadge: React.FC<{ priority: Priority }> = ({ priority }) => {
 
 // --- TaskItem Component ---
 
-const TaskItem: React.FC<{ task: Task; onUpdateTask: (task: Task) => void; onDeleteTask: (id: string) => void; onEditTask: (task: Task) => void; onReschedule: (task: Task) => void; isForTest: boolean }> = ({ task, onUpdateTask, onDeleteTask, onEditTask, onReschedule, isForTest }) => {
+const TaskItem: React.FC<{ 
+    task: Task; 
+    onCompleteTask: (task: Task) => void; 
+    onDeleteTask: (id: string) => void; 
+    onEditTask: (task: Task) => void; 
+    onReschedule: (task: Task) => void; 
+    isForTest: boolean;
+    startTimer: (task: Task) => void;
+    activeTimer: ActiveTimer | null;
+}> = ({ task, onCompleteTask, onDeleteTask, onEditTask, onReschedule, isForTest, startTimer, activeTimer }) => {
     const [isExpanded, setExpanded] = useState(false);
+    const isTimerActiveForThisTask = activeTimer?.task?.id === task.id;
+    const totalDuration = useMemo(() => (task.sessions || []).reduce((sum, s) => sum + s.duration, 0), [task.sessions]);
     
     return (
-        <div className={cn("bg-slate-900/30 rounded-lg animate-fadeIn transition-all border border-transparent hover:border-brand-cyan-500/20", isForTest && "border-l-4 border-yellow-400")}>
+        <div className={cn(
+            "bg-slate-900/30 rounded-lg animate-fadeIn transition-all border border-transparent hover:border-brand-cyan-500/20", 
+            isForTest && "border-l-4 border-yellow-400",
+            isTimerActiveForThisTask && "border-brand-cyan-500 shadow-glow-cyan"
+        )}>
             <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 flex-wrap mb-1">
                         {isForTest && <span title="This topic is in an upcoming test"><TrophyIcon className="w-5 h-5 text-yellow-400"/></span>}
                         <PriorityBadge priority={task.priority} />
-                        {/* FIX: Wrap icon in a span to apply the title attribute for tooltips, as 'title' is not a valid SVG prop in React. */}
                         {task.notes && <span title="Has notes"><StickyNoteIcon className="w-4 h-4 text-gray-400" /></span>}
                         <p className="font-semibold truncate" title={task.name}>{task.name}</p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                         <TaskTypeTag type={task.taskType} />
+                        {totalDuration > 0 && (
+                            <span className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full bg-blue-500/20 text-blue-300" title="Total time logged">
+                                <ClockIcon className="w-4 h-4" />
+                                {formatDuration(totalDuration)}
+                            </span>
+                        )}
                         <p className="text-xs text-gray-400 truncate" title={task.microtopics.join(', ')}>
                            {task.microtopics.join(', ')} ({task.subject} &gt {task.chapter})
                         </p>
@@ -283,7 +303,21 @@ const TaskItem: React.FC<{ task: Task; onUpdateTask: (task: Task) => void; onDel
                 </div>
                 <div className="flex items-center gap-1 self-end sm:self-center flex-shrink-0">
                     {task.status === 'Pending' ? (
-                        <Button onClick={() => onUpdateTask(task)} variant="secondary" size="sm">Complete</Button>
+                        <>
+                            <Button onClick={() => onCompleteTask(task)} variant="secondary" size="sm">Complete</Button>
+                            {!isTimerActiveForThisTask && (
+                                <Button 
+                                    onClick={() => startTimer(task)} 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="p-2" 
+                                    aria-label="Start timer"
+                                    disabled={!!activeTimer}
+                                >
+                                    <PlayIcon className="w-4 h-4"/>
+                                </Button>
+                            )}
+                        </>
                     ) : (
                         <span className="text-xs font-bold text-green-400 px-2 py-1 bg-green-500/20 rounded-full">Completed</span>
                     )}
@@ -318,67 +352,6 @@ const TaskItem: React.FC<{ task: Task; onUpdateTask: (task: Task) => void; onDel
 };
 
 // --- Modal Components ---
-
-const CompleteStudyModal: React.FC<{ task: Task | null; onComplete: (difficulty: number) => void; onClose: () => void }> = ({ task, onComplete, onClose }) => {
-    const [difficulty, setDifficulty] = useState(3);
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        onComplete(difficulty);
-    };
-
-    return (
-        <Modal isOpen={!!task} onClose={onClose} title={`Complete: ${task?.name}`}>
-            <form onSubmit={handleSubmit}>
-                <label className="block mb-2">How difficult was this topic? (1: Easy - 5: Hard)</label>
-                <div className="flex items-center gap-4 my-4">
-                    <span>1</span>
-                    <input type="range" min="1" max="5" value={difficulty} onChange={e => setDifficulty(Number(e.target.value))} className="w-full" />
-                    <span>5</span>
-                    <span className="font-bold text-brand-cyan-400 w-4">{difficulty}</span>
-                </div>
-                <div className="flex justify-end gap-2 mt-6">
-                    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button type="submit">Save</Button>
-                </div>
-            </form>
-        </Modal>
-    );
-};
-
-const CompletePracticeModal: React.FC<{ task: Task | null; onComplete: (total: number, correct: number) => void; onClose: () => void }> = ({ task, onComplete, onClose }) => {
-    const [total, setTotal] = useState('');
-    const [correct, setCorrect] = useState('');
-    
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const totalNum = Number(total);
-        const correctNum = Number(correct);
-        if (totalNum > 0 && correctNum <= totalNum && correctNum >= 0) {
-            onComplete(totalNum, correctNum);
-        }
-    };
-
-    return (
-        <Modal isOpen={!!task} onClose={onClose} title={`Practice Feedback: ${task?.name}`}>
-            <form onSubmit={handleSubmit}>
-                <div className="space-y-4">
-                    <div>
-                        <label className="block mb-1">Total Questions Attempted</label>
-                        <Input type="number" value={total} onChange={e => setTotal(e.target.value)} min="1" required />
-                    </div>
-                    <div>
-                        <label className="block mb-1">Number of Correct Answers</label>
-                        <Input type="number" value={correct} onChange={e => setCorrect(e.target.value)} min="0" max={total || undefined} required />
-                    </div>
-                </div>
-                <div className="flex justify-end gap-2 mt-6">
-                    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button type="submit">Save</Button>
-                </div>
-            </form>
-        </Modal>
-    );
-};
 
 const EditTaskModal: React.FC<{ task: Task | null; onUpdate: (task: Task) => void; onClose: () => void }> = ({ task, onUpdate, onClose }) => {
     const [formData, setFormData] = useState<Partial<Task>>({});
@@ -609,38 +582,21 @@ type FilterState = {
     status: TaskStatus | 'All';
 }
 
-const Planner: React.FC = () => {
-    const [tasks, setTasks] = useLocalStorage<Task[]>('tasks', []);
+interface PlannerProps {
+    tasks: Task[];
+    setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
+    activeTimer: ActiveTimer | null;
+    startTimer: (task: Task) => void;
+    onCompleteTask: (task: Task) => void;
+}
+
+const Planner: React.FC<PlannerProps> = ({ tasks, setTasks, activeTimer, startTimer, onCompleteTask }) => {
     const [testPlans] = useLocalStorage<TestPlan[]>('testPlans', []);
-    const [taskToComplete, setTaskToComplete] = useState<Task | null>(null);
     const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
     const [taskToReschedule, setTaskToReschedule] = useState<Task | null>(null);
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [filters, setFilters] = useState<FilterState>({ subject: 'All', type: 'All', priority: 'All', status: 'All' });
     
-    useEffect(() => {
-        // One-time migration for old data structure.
-        const runMigration = () => {
-            setTasks(currentTasks => {
-                const needsMigration = currentTasks.some(t => (t as any).microtopic && !t.microtopics);
-                if (needsMigration) {
-                    console.log("Migrating tasks to new data structure...");
-                    return currentTasks.map(t => {
-                        const oldTask = t as any;
-                        if (oldTask.microtopic && !t.microtopics) {
-                            const { microtopic, ...rest } = oldTask;
-                            return { ...rest, microtopics: [microtopic] };
-                        }
-                        return t;
-                    });
-                }
-                return currentTasks; // Return unchanged if no migration needed
-            });
-        };
-        runMigration();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Run only once on mount
-
     const upcomingTestTopics = useMemo(() => {
         const topicSet = new Set<string>();
         testPlans
@@ -659,21 +615,16 @@ const Planner: React.FC = () => {
         );
     };
 
-    const addTask = (taskData: Omit<Task, 'id' | 'status'>) => {
+    const addTask = (taskData: Omit<Task, 'id' | 'status' | 'sessions'>) => {
         const newTask: Task = {
             ...taskData,
             id: crypto.randomUUID(),
             status: 'Pending',
+            sessions: [],
         };
         setTasks(prevTasks => [...prevTasks, newTask].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
     };
 
-    const handleUpdateTask = (updatedTask: Task) => {
-        if (updatedTask.status === 'Pending') {
-            setTaskToComplete(updatedTask);
-        }
-    };
-    
     const handleDeleteTask = (id: string) => {
         if (window.confirm('Are you sure you want to delete this task?')) {
             setTasks(prevTasks => prevTasks.filter(task => task.id !== id));
@@ -692,24 +643,6 @@ const Planner: React.FC = () => {
         setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: newDate, originalDate: t.originalDate || t.date } : t)
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
         setTaskToReschedule(null);
-    };
-
-    const handleCompleteStudy = (difficulty: number) => {
-        if (!taskToComplete) return;
-        const performanceSummary = generatePerformanceSummary(difficulty, undefined, undefined);
-        const updatedNotes = (taskToComplete.notes || '') + performanceSummary;
-
-        setTasks(prevTasks => prevTasks.map(t => t.id === taskToComplete.id ? { ...t, status: 'Completed', difficulty, notes: updatedNotes } : t));
-        setTaskToComplete(null);
-    };
-
-    const handleCompletePractice = (total: number, correct: number) => {
-        if (!taskToComplete) return;
-        const performanceSummary = generatePerformanceSummary(undefined, total, correct);
-        const updatedNotes = (taskToComplete.notes || '') + performanceSummary;
-
-        setTasks(prevTasks => prevTasks.map(t => t.id === taskToComplete.id ? { ...t, status: 'Completed', totalQuestions: total, correctAnswers: correct, notes: updatedNotes } : t));
-        setTaskToComplete(null);
     };
     
     const tasksForSelectedDate = useMemo(() => {
@@ -773,7 +706,17 @@ const Planner: React.FC = () => {
                 ) : (
                     <div className="space-y-2">
                         {tasksForSelectedDate.map(task => (
-                            <TaskItem key={task.id} task={task} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onEditTask={setTaskToEdit} onReschedule={setTaskToReschedule} isForTest={isTaskForTest(task)} />
+                            <TaskItem 
+                                key={task.id} 
+                                task={task} 
+                                onCompleteTask={onCompleteTask} 
+                                onDeleteTask={handleDeleteTask} 
+                                onEditTask={setTaskToEdit} 
+                                onReschedule={setTaskToReschedule} 
+                                isForTest={isTaskForTest(task)}
+                                startTimer={startTimer}
+                                activeTimer={activeTimer}
+                            />
                         ))}
                     </div>
                 )}
@@ -782,17 +725,7 @@ const Planner: React.FC = () => {
             <div className="lg:col-span-1">
                 <Calendar selectedDate={selectedDate} onDateChange={setSelectedDate} tasks={tasks} />
             </div>
-            
-            <CompleteStudyModal 
-                task={taskToComplete && (taskToComplete.taskType === 'Study' || taskToComplete.taskType === 'Revision') ? taskToComplete : null}
-                onComplete={handleCompleteStudy}
-                onClose={() => setTaskToComplete(null)}
-            />
-            <CompletePracticeModal 
-                task={taskToComplete && taskToComplete.taskType === 'Practice' ? taskToComplete : null}
-                onComplete={handleCompletePractice}
-                onClose={() => setTaskToComplete(null)}
-            />
+
             <EditTaskModal 
                 task={taskToEdit}
                 onUpdate={handleSaveTaskUpdate}

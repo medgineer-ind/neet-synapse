@@ -45,8 +45,8 @@ export const Textarea: React.FC<React.TextareaHTMLAttributes<HTMLTextAreaElement
 export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; maxWidth?: string }> = ({ isOpen, onClose, title, children, maxWidth = 'max-w-2xl' }) => {
     if (!isOpen) return null;
     return (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] animate-fadeIn" onClick={onClose}>
-            <div className={cn("bg-brand-blue-900/90 border border-brand-cyan-700 rounded-lg shadow-glow-cyan p-6 w-full backdrop-blur-lg", maxWidth)} onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-start justify-center z-[100] animate-fadeIn overflow-y-auto p-4 sm:p-8" onClick={onClose}>
+            <div className={cn("bg-brand-blue-900/90 border border-brand-cyan-700 rounded-lg shadow-glow-cyan p-6 w-full backdrop-blur-lg my-8", maxWidth)} onClick={e => e.stopPropagation()}>
                 <h3 className="text-xl font-bold text-brand-cyan-400 mb-4">{title}</h3>
                 {children}
             </div>

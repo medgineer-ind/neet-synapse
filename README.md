@@ -45,34 +45,6 @@ That's it for configuration! The repository is now ready to be deployed by the w
 
 ---
 
-## Mobile & Offline Use (Progressive Web App)
-
-NEET Synapse is built as a Progressive Web App (PWA), which means you can "install" it on your phone for a native app-like experience, including offline access.
-
-### How to Install
-
-**On Android (using Chrome):**
-1.  Open the NEET Synapse website in your Chrome browser.
-2.  Tap the three-dot menu icon in the top-right corner.
-3.  Tap **"Install app"** or **"Add to Home screen"**.
-4.  Follow the on-screen prompts. The app will now appear on your home screen.
-
-**On iOS (using Safari):**
-1.  Open the NEET Synapse website in your Safari browser.
-2.  Tap the "Share" icon (a square with an arrow pointing up) in the bottom navigation bar.
-3.  Scroll down and tap **"Add to Home Screen"**.
-4.  Confirm by tapping "Add". The app will now appear on your home screen.
-
-### PWA Icons
-For the "Add to Home Screen" feature to display a proper icon, you'll need to add two icon files to the root directory of this project:
-- `icon-192.png` (192x192 pixels)
-- `icon-512.png` (512x512 pixels)
-
-These are referenced in the `manifest.json` file.
-
-### Note on APKs
-While a PWA provides a fantastic, installable, offline-first experience directly from the web, it does not generate an `.apk` file for the Google Play Store. To do that, one would typically use a tool like **Capacitor** or **Cordova** to wrap this web application into a native Android project. That process is beyond the scope of this project's current setup.
-
 ### Troubleshooting Common Issues
 
 *   **I see a blank page or a "404 Not Found" error.**
