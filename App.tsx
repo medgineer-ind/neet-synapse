@@ -1,15 +1,18 @@
-
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, NavLink } from 'react-router-dom';
+import { Routes, Route, NavLink, Link } from 'react-router-dom';
 import Planner from './components/Planner';
 import Dashboard from './components/Dashboard';
 import Settings from './components/Settings';
 import TestPlanner from './components/TestPlanner';
 import Timeline from './components/Timeline';
-import { ClipboardListIcon, LayoutDashboardIcon, SettingsIcon, FileTextIcon, CalendarClockIcon, PlayIcon, PauseIcon, StopCircleIcon, MegaphoneIcon, XIcon } from './components/ui/Icons';
+import Mentor from './components/Mentor';
+import SelfTracker from './components/SelfTracker';
+import Insights from './components/Insights';
+import { ClipboardListIcon, LayoutDashboardIcon, SettingsIcon, FileTextIcon, CalendarClockIcon, PlayIcon, PauseIcon, StopCircleIcon, MegaphoneIcon, XIcon, BrainCircuitIcon, ActivityIcon, HistoryIcon, AlertTriangleIcon } from './components/ui/Icons';
 import { Task, ActiveTimer, StudySession, TestPlan, TopicPracticeAttempt } from './types';
 import LiveBackground from './components/LiveBackground';
 import useLocalStorage from './hooks/useLocalStorage';
+import useStorageUsage from './hooks/useStorageUsage';
 import { generatePerformanceSummary, parseDurationFromInput, formatDuration } from './lib/utils';
 import { Button, Modal, Input } from './components/ui/StyledComponents';
 import { TimeEditor } from './components/ui/TimeEditor';
@@ -75,6 +78,72 @@ const AdminNotification: React.FC = () => {
                                         {linkText}
                                     </a>
                                 )}
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={handleDismiss}
+                        className="p-1 rounded-full text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+                        aria-label="Dismiss notification"
+                    >
+                        <XIcon className="w-5 h-5" />
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Storage Warning Banner ---
+const StorageWarningBanner: React.FC<{ usagePercentage: number }> = ({ usagePercentage }) => {
+    const storageKey = 'dismissed_storage_warning';
+    const [isVisible, setIsVisible] = useState(false);
+
+    const isCritical = usagePercentage > 95;
+    const isWarning = usagePercentage > 80;
+
+    useEffect(() => {
+        if (isWarning) {
+            const isDismissed = window.sessionStorage.getItem(storageKey);
+            if (!isDismissed) {
+                setIsVisible(true);
+            }
+        } else {
+            setIsVisible(false);
+        }
+    }, [isWarning, storageKey]);
+
+    const handleDismiss = () => {
+        window.sessionStorage.setItem(storageKey, 'true');
+        setIsVisible(false);
+    };
+
+    if (!isVisible) {
+        return null;
+    }
+    
+    const bannerClass = isCritical 
+        ? "bg-red-900/70 border-red-500/30" 
+        : "bg-yellow-900/70 border-yellow-500/30";
+    const iconColor = isCritical ? "text-red-400" : "text-yellow-400";
+    const title = isCritical ? "Critical Storage Alert" : "Storage Capacity Warning";
+    const message = isCritical 
+        ? "You are about to run out of storage space. To prevent data loss, please export your data now and consider removing old entries." 
+        : "Your local storage is getting full. It's recommended to export a backup of your data soon.";
+
+    return (
+         <div className={`sticky top-16 z-40 backdrop-blur-xl border-b animate-fadeIn ${bannerClass}`} role="alert">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex items-center justify-between gap-4 py-3">
+                    <div className="flex items-center gap-3">
+                        <AlertTriangleIcon className={`w-6 h-6 ${iconColor} flex-shrink-0`} />
+                        <div className="text-sm">
+                            <p className={`font-bold ${iconColor}`}>{title} ({usagePercentage.toFixed(1)}% full)</p>
+                            <p className="text-gray-300">
+                                {message}{' '}
+                                <Link to="/settings" className="underline hover:text-white font-semibold">
+                                    Go to Settings
+                                </Link>
                             </p>
                         </div>
                     </div>
@@ -185,6 +254,27 @@ const Header: React.FC = () => {
                         >
                            <CalendarClockIcon className="w-5 h-5 mr-2" /> View Agenda
                         </NavLink>
+                         <NavLink
+                            to="/mentor"
+                            className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300"
+                            style={({ isActive }) => isActive ? activeLinkStyle : { borderBottom: '2px solid transparent' }}
+                        >
+                           <BrainCircuitIcon className="w-5 h-5 mr-2" /> AI Mentor
+                        </NavLink>
+                         <NavLink
+                            to="/self-tracker"
+                            className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300"
+                            style={({ isActive }) => isActive ? activeLinkStyle : { borderBottom: '2px solid transparent' }}
+                        >
+                           <ActivityIcon className="w-5 h-5 mr-2" /> Self Tracker
+                        </NavLink>
+                         <NavLink
+                            to="/insights"
+                            className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300"
+                            style={({ isActive }) => isActive ? activeLinkStyle : { borderBottom: '2px solid transparent' }}
+                        >
+                           <HistoryIcon className="w-5 h-5 mr-2" /> Insights
+                        </NavLink>
                         <NavLink
                             to="/dashboard"
                             className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300"
@@ -215,7 +305,7 @@ const BottomNavBar: React.FC = () => {
 
     return (
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-900/50 backdrop-blur-xl border-t border-brand-cyan-500/20">
-            <div className="container mx-auto flex justify-around h-16">
+            <div className="container mx-auto grid grid-cols-8 h-16">
                  <NavLink
                     to="/"
                     className="flex flex-col items-center justify-center w-full text-xs font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300 pt-1"
@@ -228,14 +318,35 @@ const BottomNavBar: React.FC = () => {
                     className="flex flex-col items-center justify-center w-full text-xs font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300 pt-1"
                     style={({ isActive }) => isActive ? activeLinkStyle : {}}
                 >
-                   <FileTextIcon className="w-6 h-6 mb-1" /> Test Planner
+                   <FileTextIcon className="w-6 h-6 mb-1" /> Tests
                 </NavLink>
                 <NavLink
                     to="/timeline"
                     className="flex flex-col items-center justify-center w-full text-xs font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300 pt-1"
                     style={({ isActive }) => isActive ? activeLinkStyle : {}}
                 >
-                   <CalendarClockIcon className="w-6 h-6 mb-1" /> View Agenda
+                   <CalendarClockIcon className="w-6 h-6 mb-1" /> Agenda
+                </NavLink>
+                 <NavLink
+                    to="/mentor"
+                    className="flex flex-col items-center justify-center w-full text-xs font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300 pt-1"
+                    style={({ isActive }) => isActive ? activeLinkStyle : {}}
+                >
+                   <BrainCircuitIcon className="w-6 h-6 mb-1" /> Mentor
+                </NavLink>
+                 <NavLink
+                    to="/self-tracker"
+                    className="flex flex-col items-center justify-center w-full text-xs font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300 pt-1"
+                    style={({ isActive }) => isActive ? activeLinkStyle : {}}
+                >
+                   <ActivityIcon className="w-6 h-6 mb-1" /> Tracker
+                </NavLink>
+                 <NavLink
+                    to="/insights"
+                    className="flex flex-col items-center justify-center w-full text-xs font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300 pt-1"
+                    style={({ isActive }) => isActive ? activeLinkStyle : {}}
+                >
+                   <HistoryIcon className="w-6 h-6 mb-1" /> Insights
                 </NavLink>
                 <NavLink
                     to="/dashboard"
@@ -395,6 +506,12 @@ const App: React.FC = () => {
     const [taskToFinalize, setTaskToFinalize] = useState<{ task: Task; duration: number } | null>(null);
     const [sessionToConfirm, setSessionToConfirm] = useState<{ task: Task; duration: number } | null>(null);
     const [completedTestInfo, setCompletedTestInfo] = useState<{ test: TestPlan, duration: number } | null>(null);
+    const [targetScore, setTargetScore] = useLocalStorage<number>('targetScore', 680);
+    const { usagePercentage, refreshUsage } = useStorageUsage();
+
+    useEffect(() => {
+        refreshUsage();
+    }, [tasks, testPlans, refreshUsage]);
 
     useEffect(() => {
         // One-time data migrations for tasks
@@ -636,6 +753,7 @@ const App: React.FC = () => {
             <div className="absolute inset-0 -z-10 bg-brand-blue-900/95"></div>
             <Header />
             <AdminNotification />
+            <StorageWarningBanner usagePercentage={usagePercentage} />
             <main className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-24">
                 <Routes>
                     <Route path="/" element={
@@ -661,6 +779,16 @@ const App: React.FC = () => {
                         />
                     } />
                     <Route path="/timeline" element={<Timeline />} />
+                    <Route path="/mentor" element={
+                        <Mentor 
+                            tasks={tasks} 
+                            testPlans={testPlans} 
+                            targetScore={targetScore} 
+                            setTargetScore={setTargetScore} 
+                        />
+                    } />
+                    <Route path="/self-tracker" element={<SelfTracker tasks={tasks} testPlans={testPlans} />} />
+                    <Route path="/insights" element={<Insights tasks={tasks} testPlans={testPlans} targetScore={targetScore} />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/settings" element={<Settings />} />
                 </Routes>
