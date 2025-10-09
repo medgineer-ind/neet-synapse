@@ -297,7 +297,7 @@ const TaskItem: React.FC<{
                             </span>
                         )}
                         <p className="text-xs text-gray-400 truncate" title={task.microtopics.join(', ')}>
-                           {task.microtopics.join(', ')} ({task.subject} > {task.chapter})
+                           {task.microtopics.join(', ')} ({task.subject} &gt {task.chapter})
                         </p>
                     </div>
                 </div>
