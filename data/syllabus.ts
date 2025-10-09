@@ -2,90 +2,678 @@ import { Syllabus } from '../types';
 
 export const syllabus: Syllabus = {
   Physics: {
-    "Physics, Units & Measurements": ["Units of measurements", "System of Units", "SI units", "Fundamental and derived units", "Least count", "Significant figures", "Errors in measurement", "Dimensions of Physical Quantities", "Dimensional analysis"],
-    "Kinematics": ["Frame of reference", "Motion in a straight line", "Position-time graph", "Speed and velocity", "Uniform and non-uniform motion", "Average speed and instantaneous velocity", "Uniformly accelerated motion", "Velocity-time graph", "Scalar and Vector quantities", "Position and displacement vectors", "Addition and subtraction of vectors", "Relative velocity", "Unit vector", "Resolution of a vector", "Scalar and Vector products", "Projectile motion", "Uniform circular motion"],
-    "Laws of Motion": ["Concept of force & Inertia", "Newton's first law", "Momentum and Newton's second law", "Impulse & Newton's third law", "Conservation of linear momentum", "Equilibrium of concurrent forces", "Static and kinetic friction", "Laws of friction", "Rolling friction", "Dynamics of uniform circular motion", "Centripetal force"],
-    "Work, Energy and Power": ["Work done by a constant and a variable force", "Kinetic energy & Work-energy theorem", "Power", "Potential energy & Potential energy of a spring", "Conservative and Non-conservative forces", "Conservation of mechanical energy", "Motion in a vertical circle", "Elastic and inelastic collisions"],
-    "Rotational Motion": ["Centre of mass of a two-particle system", "Centre of mass of a rigid body", "Moment of a force & Torque", "Angular momentum & its conservation", "Equilibrium of rigid bodies", "Equations of rotational motion", "Moment of inertia & Radius of gyration", "Parallel and perpendicular axes theorems"],
-    "Gravitation": ["Kepler's laws of planetary motion", "The universal law of gravitation", "Acceleration due to gravity and its variations", "Gravitational potential energy and potential", "Escape velocity & Orbital velocity", "Geo-stationary satellites"],
-    "Properties of Solids and Liquids": ["Elastic behaviour & Stress-strain relationship", "Hooke's law, Young's modulus, Bulk modulus", "Pressure due to a fluid column", "Pascal's law and its applications", "Viscosity, Stokes' law, Terminal velocity", "Bernoulli's theorem and its applications", "Surface energy and surface tension", "Angle of contact & Capillary rise", "Heat, temperature, thermal expansion", "Specific heat capacity & Calorimetry", "Change of state & Latent heat", "Heat transfer: Conduction, convection, radiation"],
-    "Thermodynamics": ["Thermal equilibrium & Zeroth law", "Heat, work and internal energy", "First law of thermodynamics", "Isothermal and adiabatic processes", "Second law of thermodynamics", "Heat engine and refrigerator"],
-    "Kinetic Theory of Gases": ["Equation of state of a perfect gas", "Kinetic theory of gases & Concept of pressure", "RMS speed of gas molecules", "Degrees of freedom & Law of equipartition of energy", "Mean free path & Avogadro's number"],
-    "Oscillations and Waves": ["Periodic motion, Period, frequency", "Simple harmonic motion (SHM) & its equation", "Energy in SHM", "Simple pendulum", "Damped and forced oscillations, Resonance", "Wave motion: Longitudinal and transverse waves", "Principle of superposition of waves", "Reflection and standing waves", "Beats & Doppler effect"],
-    "Electrostatics": ["Electric charges and Coulomb's law", "Electric field and electric field lines", "Electric dipole & Electric flux", "Gauss's theorem and its applications", "Electric potential and potential difference", "Equipotential surfaces", "Electrical potential energy", "Conductors, insulators, and dielectrics", "Capacitors and capacitance", "Combination of capacitors", "Energy stored in a capacitor"],
-    "Current Electricity": ["Electric current & Drift velocity", "Ohm's law, V-I characteristics", "Electrical energy and power", "Resistivity and conductivity", "Series and parallel combinations of resistors", "Internal resistance of a cell", "Kirchhoff's laws", "Wheatstone bridge & Metre bridge", "Potentiometer and its applications"],
-    "Magnetic Effects of Current & Magnetism": ["Concept of magnetic field, Oersted's experiment", "Biot-Savart law and its application", "Ampere's law and its applications", "Force on a moving charge", "Force on a current-carrying conductor", "Torque on a current loop", "Moving coil galvanometer", "Earth's magnetic field", "Para-, dia- and ferro-magnetic substances"],
-    "Electromagnetic Induction & AC": ["Faraday's laws, induced EMF and current", "Lenz's Law, Eddy currents", "Self and mutual induction", "Alternating currents, peak and RMS value", "Reactance and impedance", "LC oscillations, LCR series circuit, resonance", "Power in AC circuits", "AC generator and transformer"],
-    "Electromagnetic Waves": ["Displacement current", "Electromagnetic wave characteristics", "Electromagnetic spectrum and its uses"],
-    "Optics": ["Reflection and spherical mirrors", "Refraction, TIR and optical fibres", "Lenses, lens-maker's formula", "Power of a lens & Combination of lenses", "Refraction through a prism", "Optical instruments: Microscopes and telescopes", "Wave optics: Wavefront and Huygens' principle", "Interference, Young's double slit experiment", "Diffraction due to a single slit", "Polarisation and Brewster's law"],
-    "Dual Nature of Matter and Radiation": ["Photoelectric effect", "Einstein's photoelectric equation", "Matter waves, de Broglie relation", "Davisson-Germer experiment"],
-    "Atoms and Nuclei": ["Rutherford's model of atom", "Bohr model, energy levels, hydrogen spectrum", "Composition and size of nucleus", "Radioactivity, alpha, beta, gamma decay", "Mass-energy relation, mass defect", "Binding energy", "Nuclear fission and fusion"],
-    "Electronic Devices": ["Energy bands in solids", "Semiconductor diode, I-V characteristics", "Diode as a rectifier", "Zener diode as a voltage regulator", "Junction transistor and its characteristics", "Transistor as an amplifier and oscillator", "Logic gates (OR, AND, NOT, NAND, NOR)"],
+    "Physical World": [
+        "What is Physics?",
+        "Scope and excitement of Physics",
+        "Physics, technology and society",
+        "Fundamental forces in nature",
+        "Nature of physical laws"
+    ],
+    "Units and Measurements": [
+        "The international system of units (SI units)",
+        "Measurement of length, mass and time",
+        "Accuracy, precision, errors in measurement",
+        "Significant figures",
+        "Dimensions of physical quantities and dimensional analysis"
+    ],
+    "Motion in a Straight Line": [
+        "Position, path length, displacement",
+        "Average speed and average velocity",
+        "Instantaneous speed and velocity",
+        "Acceleration and retardation",
+        "Graphical analysis of motion",
+        "Equations of motion for uniformly accelerated motion"
+    ],
+    "Motion in a Plane": [
+        "Scalars and vectors",
+        "Vector addition and subtraction",
+        "Multiplication of vectors by a real number",
+        "Resolution of vectors",
+        "Motion in a plane and projectile motion",
+        "Uniform circular motion"
+    ],
+    "Laws of Motion": [
+        "Newton’s laws of motion",
+        "Inertia and mass",
+        "Force and momentum",
+        "Impulse",
+        "Law of conservation of momentum",
+        "Friction and types of friction",
+        "Circular motion dynamics"
+    ],
+    "Work, Energy and Power": [
+        "Work done by a constant and variable force",
+        "Kinetic energy and work–energy theorem",
+        "Potential energy",
+        "Conservation of mechanical energy",
+        "Power"
+    ],
+    "System of Particles and Rotational Motion": [
+        "Centre of mass and its motion",
+        "Linear momentum of a system of particles",
+        "Torque and angular momentum",
+        "Equilibrium of a rigid body",
+        "Moment of inertia and radius of gyration",
+        "Theorems of perpendicular and parallel axes",
+        "Rolling motion"
+    ],
+    "Gravitation": [
+        "Universal law of gravitation",
+        "Acceleration due to gravity and its variation",
+        "Gravitational potential energy",
+        "Escape velocity",
+        "Orbital velocity of satellite",
+        "Kepler’s laws of planetary motion",
+        "Geostationary satellites"
+    ],
+    "Mechanical Properties of Solids": [
+        "Elastic behaviour and stress–strain relationship",
+        "Hooke’s law and modulus of elasticity",
+        "Stress–strain curve",
+        "Elastic energy"
+    ],
+    "Mechanical Properties of Fluids": [
+        "Pressure and Pascal’s law",
+        "Buoyant force and Archimedes’ principle",
+        "Streamline flow and equation of continuity",
+        "Bernoulli’s principle and its applications",
+        "Viscosity and terminal velocity",
+        "Surface tension"
+    ],
+    "Thermal Properties of Matter": [
+        "Temperature and heat",
+        "Thermal expansion of solids, liquids and gases",
+        "Specific heat capacity",
+        "Change of state and latent heat",
+        "Heat transfer: conduction, convection, radiation",
+        "Newton’s law of cooling"
+    ],
+    "Thermodynamics": [
+        "System and surroundings",
+        "Work, internal energy and heat",
+        "First law of thermodynamics",
+        "Isothermal and adiabatic processes",
+        "Second law of thermodynamics",
+        "Reversible and irreversible processes",
+        "Heat engines"
+    ],
+    "Kinetic Theory": [
+        "Molecular nature of matter",
+        "Behaviour of gases and kinetic theory assumptions",
+        "Pressure of an ideal gas",
+        "Kinetic interpretation of temperature",
+        "Degrees of freedom and law of equipartition of energy",
+        "Mean free path"
+    ],
+    "Oscillations": [
+        "Periodic and oscillatory motion",
+        "Simple harmonic motion and equations",
+        "Energy in SHM",
+        "Damped and forced oscillations",
+        "Resonance"
+    ],
+    "Waves": [
+        "Wave motion and terminology",
+        "Longitudinal and transverse waves",
+        "Speed of a wave on a stretched string",
+        "Reflection and superposition principle",
+        "Standing waves and resonance",
+        "Beats"
+    ],
+    "Electric Charges and Fields": [
+        "Electric charge and its conservation",
+        "Coulomb’s law",
+        "Electric field and field lines",
+        "Electric flux and Gauss’s law",
+        "Field due to a uniformly charged infinite sheet, wire and shell"
+    ],
+    "Electrostatic Potential and Capacitance": [
+        "Potential difference and potential due to a point charge",
+        "Equipotential surfaces",
+        "Relation between field and potential",
+        "Capacitance and capacitor combinations",
+        "Energy stored in a capacitor"
+    ],
+    "Current Electricity": [
+        "Electric current and drift velocity",
+        "Ohm’s law and resistivity",
+        "Temperature dependence of resistance",
+        "Kirchhoff’s laws",
+        "Wheatstone bridge and meter bridge",
+        "Potentiometer and its applications"
+    ],
+    "Moving Charges and Magnetism": [
+        "Magnetic field due to current element – Biot–Savart law",
+        "Ampere’s circuital law",
+        "Force on moving charge and current-carrying conductor",
+        "Motion in combined electric and magnetic fields",
+        "Torque on a current loop",
+        "Magnetic dipole and bar magnet"
+    ],
+    "Magnetism and Matter": [
+        "Earth’s magnetic field",
+        "Magnetic properties of materials",
+        "Magnetization and magnetic susceptibility",
+        "Hysteresis"
+    ],
+    "Electromagnetic Induction": [
+        "Faraday’s laws of induction",
+        "Lenz’s law and eddy currents",
+        "Self and mutual induction",
+        "Inductance"
+    ],
+    "Alternating Current": [
+        "AC voltage and current",
+        "Phasor diagrams",
+        "Reactance, impedance, and power in AC circuits",
+        "Resonance in LCR circuit",
+        "Transformers"
+    ],
+    "Electromagnetic Waves": [
+        "Displacement current",
+        "Maxwell’s equations (qualitative)",
+        "Electromagnetic spectrum and its applications"
+    ],
+    "Ray Optics and Optical Instruments": [
+        "Reflection and refraction of light",
+        "Total internal reflection",
+        "Mirror and lens formulae",
+        "Dispersion and scattering of light",
+        "Optical instruments: microscope, telescope"
+    ],
+    "Wave Optics": [
+        "Huygens’ principle",
+        "Interference and Young’s double-slit experiment",
+        "Diffraction and polarization"
+    ],
+    "Dual Nature of Radiation and Matter": [
+        "Photoelectric effect and Einstein’s equation",
+        "de Broglie hypothesis",
+        "Davisson–Germer experiment"
+    ],
+    "Atoms": [
+        "Rutherford and Bohr models",
+        "Hydrogen spectrum",
+        "Energy levels and emission spectra"
+    ],
+    "Nuclei": [
+        "Composition of nucleus and mass defect",
+        "Binding energy and nuclear stability",
+        "Radioactivity and decay laws",
+        "Nuclear fission and fusion"
+    ],
+    "Semiconductor Electronics": [
+        "Intrinsic and extrinsic semiconductors",
+        "PN junction diode and characteristics",
+        "Zener diode, LED, photodiode, solar cell",
+        "Logic gates (AND, OR, NOT, NAND, NOR)"
+    ]
   },
   Chemistry: {
-    "Some Basic Concepts of Chemistry": ["Laws of chemical combination", "Dalton's atomic theory", "Mole concept and molar mass", "Percentage composition, empirical and molecular formula", "Stoichiometry and calculations"],
-    "Structure of Atom": ["Atomic number, isotopes and isobars", "Shells and subshells", "Dual nature of matter and light", "de Broglie's relationship", "Heisenberg uncertainty principle", "Quantum numbers & Orbitals", "Aufbau principle, Pauli exclusion principle, Hund's rule", "Electronic configuration of atoms"],
-    "Classification of Elements and Periodicity": ["Modern periodic law", "Periodic trends in properties", "Atomic and ionic radii", "Ionization enthalpy", "Electron gain enthalpy", "Electronegativity, valence"],
-    "Chemical Bonding and Molecular Structure": ["Valence electrons, ionic and covalent bond", "Bond parameters & Lewis structure", "VSEPR theory", "Valence bond theory & Hybridization", "Molecular orbital theory", "Hydrogen bond"],
-    "Chemical Thermodynamics": ["Systems and surroundings", "First law of thermodynamics", "Internal energy and enthalpy", "Hess's law", "Enthalpy of bond dissociation, combustion, formation", "Second law of thermodynamics", "Gibbs energy change", "Third law of thermodynamics"],
-    "Equilibrium": ["Law of chemical equilibrium, equilibrium constant", "Le Chatelier's principle", "Ionic equilibrium", "Acids and bases, pH concept", "Hydrolysis of salts", "Buffer solutions", "Solubility product & Common ion effect"],
-    "Redox Reactions": ["Concept of oxidation and reduction", "Oxidation number", "Balancing redox reactions"],
-    "Organic Chemistry: Basic Principles & Techniques": ["IUPAC nomenclature", "Electronic displacements: inductive, electromeric, resonance", "Homolytic and heterolytic fission", "Electrophiles and nucleophiles", "Types of organic reactions"],
-    "Hydrocarbons": ["Alkanes: Nomenclature, isomerism, reactions", "Alkenes: Nomenclature, structure, preparation, reactions", "Alkynes: Nomenclature, structure, acidic character, reactions", "Aromatic hydrocarbons: Benzene, resonance, aromaticity", "Electrophilic substitution mechanism"],
-    "Solutions": ["Types of solutions & Concentration units", "Solubility of gases in liquids", "Colligative properties", "Raoult's law", "Abnormal molecular mass & Vant Hoff factor"],
-    "Electrochemistry": ["Redox reactions", "Conductance in electrolytic solutions", "Kohlrausch's Law & Electrolysis", "Galvanic cells & EMF of a cell", "Nernst equation", "Relation between Gibbs energy and EMF", "Fuel cells & Corrosion"],
-    "Chemical Kinetics": ["Rate of a reaction", "Factors affecting reaction rates", "Order and molecularity of a reaction", "Rate law and specific rate constant", "Integrated rate equations and half-life", "Collision theory & Activation energy"],
-    "d and f Block Elements": ["General introduction and electronic configuration", "Properties of transition metals", "Preparation of K2Cr2O7 and KMnO4", "Lanthanoids: configuration, oxidation states, contraction", "Actinoids: configuration, oxidation states"],
-    "Coordination Compounds": ["Introduction, ligands, coordination number", "IUPAC nomenclature", "Bonding: Werner's, VBT, CFT", "Isomerism in coordination compounds", "Importance of coordination compounds"],
-    "Haloalkanes and Haloarenes": ["Nomenclature and nature of C–X bond", "Properties and reaction mechanisms", "Uses and environmental effects"],
-    "Alcohols, Phenols and Ethers": ["Nomenclature and preparation methods", "Physical and chemical properties", "Identification of primary, secondary, tertiary alcohols", "Acidic nature of phenol", "Mechanism of dehydration"],
-    "Aldehydes, Ketones and Carboxylic Acids": ["Nomenclature and nature of carbonyl group", "Preparation methods", "Physical and chemical properties", "Mechanism of nucleophilic addition", "Acidic nature of carboxylic acids"],
-    "Organic Compounds Containing Nitrogen": ["Amines: Nomenclature, classification, properties", "Identification of primary, secondary, tertiary amines", "Diazonium salts: Preparation and reactions"],
-    "Biomolecules": ["Carbohydrates: Classification and importance", "Proteins: Amino acids, peptide bond, structures", "Enzymes & Hormones", "Vitamins & Nucleic Acids (DNA, RNA)"],
-    "Polymers": ["Classification: Natural and synthetic", "Methods of polymerization", "Important polymers and their uses"],
-    "Chemistry in Everyday Life": ["Chemicals in medicines: Analgesics, antibiotics etc.", "Chemicals in food: Preservatives, sweetening agents", "Cleansing agents: Soaps and detergents"],
+    "Some Basic Concepts of Chemistry": [
+        "Importance of chemistry",
+        "Laws of chemical combination",
+        "Dalton’s atomic theory",
+        "Atomic and molecular masses",
+        "Mole concept and molar mass",
+        "Percentage composition and empirical/molecular formula",
+        "Chemical reactions, stoichiometry and limiting reagent"
+    ],
+    "Structure of Atom": [
+        "Discovery of subatomic particles",
+        "Thomson, Rutherford, and Bohr models",
+        "Nature of electromagnetic radiation",
+        "Spectrum of hydrogen atom",
+        "Quantum mechanical model of atom",
+        "Orbitals and quantum numbers",
+        "Shapes of s, p, d orbitals",
+        "Electronic configuration of atoms"
+    ],
+    "Classification of Elements and Periodicity in Properties": [
+        "Modern periodic law and periodic table",
+        "Periodic trends in atomic radius, ionization enthalpy, electron gain enthalpy, electronegativity",
+        "Valency and periodic trends",
+        "Anomalous properties of the second period"
+    ],
+    "Chemical Bonding and Molecular Structure": [
+        "Valence electrons and Lewis structures",
+        "Ionic and covalent bonds",
+        "Bond parameters: bond length, bond angle, bond enthalpy, bond order",
+        "VSEPR theory and molecular shapes",
+        "Valence Bond Theory (VBT)",
+        "Hybridization and shapes of molecules",
+        "Molecular Orbital Theory (MOT)",
+        "Hydrogen bonding and resonance"
+    ],
+    "States of Matter: Gases and Liquids": [
+        "Intermolecular forces",
+        "Gas laws: Boyle’s, Charles’, Avogadro’s, Gay Lussac’s",
+        "Ideal gas equation",
+        "Kinetic molecular theory of gases",
+        "Deviation from ideal behaviour, compressibility factor",
+        "Liquefaction of gases",
+        "Properties of liquids: surface tension, viscosity"
+    ],
+    "Thermodynamics": [
+        "System and surroundings, types of systems",
+        "Work, heat and internal energy",
+        "First law of thermodynamics",
+        "Enthalpy and enthalpy changes",
+        "Heat capacity and calorimetry",
+        "Hess’s law",
+        "Spontaneity and Gibbs free energy",
+        "Second law of thermodynamics"
+    ],
+    "Equilibrium": [
+        "Dynamic nature of equilibrium",
+        "Law of mass action and equilibrium constant",
+        "Factors affecting equilibrium (Le Chatelier’s principle)",
+        "Ionic equilibrium in aqueous solutions",
+        "pH, pOH, buffer solutions",
+        "Solubility product (Ksp)",
+        "Common ion effect"
+    ],
+    "Redox Reactions": [
+        "Oxidation and reduction (classical and electronic concepts)",
+        "Oxidation number and balancing redox reactions",
+        "Redox reactions in everyday life"
+    ],
+    "Hydrogen": [
+        "Position of hydrogen in periodic table",
+        "Isotopes of hydrogen",
+        "Hydrides (ionic, covalent, interstitial)",
+        "Water and its physical/chemical properties",
+        "Hydrogen peroxide: structure and uses",
+        "Hydrogen as a fuel"
+    ],
+    "The s-Block Elements (Alkali and Alkaline Earth Metals)": [
+        "Group 1 and 2 elements – occurrence and electronic configuration",
+        "Physical and chemical properties",
+        "Anomalous behaviour of Li and Be",
+        "Important compounds: NaCl, NaOH, Na₂CO₃, NaHCO₃, CaO, CaCO₃, CaSO₄·2H₂O",
+        "Biological importance of Na, K, Mg, Ca"
+    ],
+    "The p-Block Element (Group 13 and 14)": [
+        "Group 13 elements: electronic configuration, atomic properties",
+        "Important compounds of boron (borax, boric acid)",
+        "Group 14 elements: carbon and silicon",
+        "Allotropes of carbon",
+        "Important compounds of carbon and silicon"
+    ],
+    "Organic Chemistry – Some Basic Principles and Techniques": [
+        "General introduction and classification of organic compounds",
+        "IUPAC nomenclature",
+        "Structural representation of organic compounds",
+        "Electronic displacement effects (inductive, resonance, hyperconjugation)",
+        "Homolytic and heterolytic fission",
+        "Types of organic reactions",
+        "Methods of purification (crystallization, distillation, chromatography)"
+    ],
+    "Hydrocarbons": [
+        "Classification of hydrocarbons: alkanes, alkenes, alkynes",
+        "Alkanes: free radical halogenation",
+        "Alkenes: electrophilic addition, Markovnikov’s rule",
+        "Alkynes: acidity, addition reactions",
+        "Aromatic hydrocarbons: aromaticity and electrophilic substitution",
+        "Benzene and its derivatives"
+    ],
+    "Environmental Chemistry": [
+        "Environmental pollution: air, water, soil",
+        "Green chemistry",
+        "Ozone depletion and global warming"
+    ],
+    "Solid State": [
+        "General characteristics of solids",
+        "Amorphous and crystalline solids",
+        "Unit cell and lattice parameters",
+        "Packing efficiency",
+        "Imperfections in solids",
+        "Electrical properties (conductors, semiconductors, insulators)"
+    ],
+    "Solutions": [
+        "Types of solutions",
+        "Concentration terms (molarity, molality, mole fraction)",
+        "Solubility of gases and solids",
+        "Raoult’s law and vapour pressure",
+        "Colligative properties (elevation in boiling point, depression in freezing point, osmotic pressure)",
+        "Abnormal molar mass"
+    ],
+    "Electrochemistry": [
+        "Redox reactions and electrochemical cells",
+        "Galvanic cells and cell notation",
+        "Nernst equation and equilibrium constant",
+        "Conductivity and molar conductivity",
+        "Electrolytic cells and Faraday’s laws",
+        "Corrosion and its prevention"
+    ],
+    "Chemical Kinetics": [
+        "Rate of reaction and factors affecting it",
+        "Order and molecularity",
+        "Integrated rate equations for zero and first order",
+        "Half-life",
+        "Collision theory and activation energy"
+    ],
+    "Surface Chemistry": [
+        "Adsorption and its types",
+        "Catalysis and enzyme catalysis",
+        "Colloids: types, properties, emulsions"
+    ],
+    "General Principles and Processes of Isolation of Elements": [
+        "Occurrence of metals and ores",
+        "Concentration of ores",
+        "Principles of extraction",
+        "Thermodynamic and electrochemical principles of metallurgy",
+        "Refining processes"
+    ],
+    "The p-Block Elements": [
+        "Group 15 (Nitrogen family): properties and compounds (NH₃, HNO₃)",
+        "Group 16 (Oxygen family): properties and compounds (O₃, H₂S, H₂SO₄)",
+        "Group 17 (Halogens): interhalogen compounds, bleaching powder",
+        "Group 18 (Noble gases): properties and uses"
+    ],
+    "The d- and f-Block Elements": [
+        "Transition elements: properties, oxidation states, formation of colored ions",
+        "Coordination compounds of transition metals",
+        "Lanthanoids and actinoids: electronic configuration, oxidation states, and properties"
+    ],
+    "Coordination Compounds": [
+        "Ligands and coordination number",
+        "Nomenclature of coordination compounds",
+        "Isomerism (geometrical, optical)",
+        "Valence bond theory and crystal field theory (qualitative)",
+        "Importance and applications of coordination compounds"
+    ],
+    "Haloalkanes and Haloarenes": [
+        "Nomenclature and classification",
+        "Nature of C–X bond",
+        "Substitution reactions (SN1 and SN2)",
+        "Environmental effects (CFCs)"
+    ],
+    "Alcohols, Phenols and Ethers": [
+        "Nomenclature, structure and properties",
+        "Preparation and reactions of alcohols and phenols",
+        "Dehydration and oxidation reactions",
+        "Ethers – preparation and reactions"
+    ],
+    "Aldehydes, Ketones and Carboxylic Acids": [
+        "Nomenclature and structure",
+        "Preparation and properties",
+        "Nucleophilic addition reactions",
+        "Oxidation and reduction reactions",
+        "Acidity of carboxylic acids"
+    ],
+    "Amines": [
+        "Classification and nomenclature",
+        "Preparation and properties",
+        "Basicity of amines",
+        "Diazonium salts and their importance"
+    ],
+    "Biomolecules": [
+        "Carbohydrates: monosaccharides and polysaccharides",
+        "Proteins: amino acids, peptide bond, structure",
+        "Enzymes: mechanism of action",
+        "Nucleic acids (DNA & RNA)",
+        "Vitamins and hormones (basic idea)"
+    ],
+    "Polymers": [
+        "Classification of polymers",
+        "Types of polymerization",
+        "Addition and condensation polymers",
+        "Copolymers and biodegradable polymers"
+    ],
+    "Chemistry in Everyday Life": [
+        "Drugs and their classification (analgesics, antibiotics, antiseptics)",
+        "Chemicals in food and cleansing agents",
+        "Artificial sweeteners and preservatives"
+    ]
   },
   Botany: {
-    "The Living World": ["What is living?", "Biodiversity & Taxonomy", "Concept of species and taxonomical hierarchy", "Binomial nomenclature"],
-    "Biological Classification": ["Five kingdom classification", "Monera, Protista and Fungi", "Lichens, Viruses and Viroids"],
-    "Plant Kingdom": ["Algae & Bryophytes", "Pteridophytes & Gymnosperms", "Angiosperms", "Plant life cycles and alternation of generations"],
-    "Morphology of Flowering Plants": ["Root, Stem, Leaf morphology and modifications", "Inflorescence, Flower, Fruit and Seed"],
-    "Anatomy of Flowering Plants": ["Plant Tissues", "Anatomy of Dicotyledonous and Monocotyledonous plants", "Secondary growth"],
-    "Cell: The Unit of Life": ["Cell theory", "Prokaryotic and Eukaryotic cells", "Cell organelles: structure and function", "Endomembrane system, Mitochondria, Plastids", "Nucleus and Chromosomes"],
-    "Cell Cycle and Cell Division": ["Cell cycle", "Mitosis and its stages", "Meiosis and its stages", "Significance of Mitosis and Meiosis"],
-    "Transport in Plants": ["Means of transport", "Plant-water relations: Osmosis, Plasmolysis", "Long distance transport of water", "Transpiration", "Uptake and translocation of mineral nutrients", "Phloem transport: Mass flow hypothesis"],
-    "Mineral Nutrition": ["Essential minerals: Macro and micronutrients", "Role and deficiency symptoms of minerals", "Nitrogen cycle and nitrogen fixation"],
-    "Photosynthesis in Higher Plants": ["Site of photosynthesis & Pigments involved", "Photochemical and biosynthetic phases", "Cyclic and non-cyclic photophosphorylation", "Chemiosmotic hypothesis", "C3 and C4 pathways", "Factors affecting photosynthesis"],
-    "Respiration in Plants": ["Cellular respiration: Glycolysis", "Fermentation", "TCA cycle and electron transport system (ETS)", "Amphibolic pathways & Respiratory quotient"],
-    "Plant Growth and Development": ["Phases of plant growth", "Plant growth regulators: Auxin, Gibberellin, Cytokinin, etc.", "Photoperiodism & Vernalisation", "Seed germination and dormancy"],
-    "Reproduction in Organisms": ["Asexual Reproduction", "Sexual Reproduction"],
-    "Sexual Reproduction in Flowering Plants": ["Flower structure", "Development of male and female gametophytes", "Pollination: types and agencies", "Double fertilization", "Post-fertilization events: Endosperm, embryo, seed, fruit"],
-    "Principles of Inheritance and Variation": ["Mendelian Inheritance & Deviations from Mendelism", "Incomplete dominance, Co-dominance, Multiple alleles", "Chromosome theory of inheritance", "Sex determination", "Linkage and crossing over", "Mendelian and Chromosomal disorders"],
-    "Molecular Basis of Inheritance": ["Structure of DNA and RNA", "DNA packaging & DNA replication", "Central dogma: Transcription and Translation", "Genetic code", "Gene expression and regulation: Lac Operon", "Human Genome Project & DNA fingerprinting"],
-    "Strategies for Enhancement in Food Production": ["Plant breeding", "Tissue culture", "Single cell protein (SCP)", "Biofortification"],
-    "Microbes in Human Welfare": ["Microbes in household food processing and industry", "Sewage treatment", "Microbes as biocontrol agents and biofertilizers"],
-    "Biotechnology: Principles and Processes": ["Genetic engineering (Recombinant DNA technology)", "Tools and processes of RDT"],
-    "Biotechnology and Its Applications": ["Application in health and agriculture", "Genetically modified (GM) organisms: Bt crops", "Biosafety issues: Biopiracy and patents"],
-    "Organisms and Populations": ["Organisms and its Environment", "Population interactions", "Population attributes"],
-    "Ecosystem": ["Ecosystem components, productivity, decomposition", "Energy flow & Ecological pyramids", "Nutrient cycling (Carbon and Phosphorous)"],
-    "Biodiversity and Conservation": ["Concept and patterns of biodiversity", "Importance and loss of biodiversity", "Biodiversity conservation strategies"],
-    "Environmental Issues": ["Air and water pollution and their control", "Solid waste management", "Greenhouse effect and global warming", "Ozone depletion & Deforestation"],
+    // Class 11
+    "The Living World": [
+        "What is living?",
+        "Biodiversity & Taxonomy",
+        "Three domains of life",
+        "Taxonomical hierarchy",
+        "Binomial nomenclature"
+    ],
+    "Biological Classification": [
+        "Five kingdom classification",
+        "Monera, Protista, Fungi",
+        "Viruses, Viroids, and Lichens"
+    ],
+    "Plant Kingdom": [
+        "Algae, Bryophytes, Pteridophytes",
+        "Gymnosperms and Angiosperms",
+        "Plant life cycles and alternation of generations"
+    ],
+    "Morphology of Flowering Plants": [
+        "The Root, Stem, Leaf",
+        "The Inflorescence, Flower, Fruit and Seed",
+        "Description of Families: Fabaceae, Solanaceae, Liliaceae"
+    ],
+    "Anatomy of Flowering Plants": [
+        "The Tissues & Tissue System",
+        "Anatomy of Dicotyledonous and Monocotyledonous Plants",
+        "Secondary Growth"
+    ],
+    "Cell: The Unit of Life": [
+        "Cell Theory & Overview of Cell",
+        "Prokaryotic & Eukaryotic Cells",
+        "Cell Membrane & Cell Wall",
+        "Endomembrane System: ER, Golgi, Lysosomes, Vacuoles",
+        "Mitochondria, Plastids, Ribosomes",
+        "Cytoskeleton, Cilia, Flagella, Centrosome and Centrioles",
+        "Nucleus & Chromosomes"
+    ],
+    "Cell Cycle and Cell Division": [
+        "Cell Cycle Phases (Interphase, M Phase)",
+        "Mitosis and its Significance",
+        "Meiosis and its Significance"
+    ],
+    "Photosynthesis in Higher Plants": [
+        "Site of Photosynthesis & Pigments",
+        "Light Reaction (Photochemical phase)",
+        "The Electron Transport & ATP Synthesis (Chemiosmosis)",
+        "Dark Reaction (Biosynthetic Phase): C3 & C4 pathways",
+        "Photorespiration",
+        "Factors affecting Photosynthesis"
+    ],
+    "Respiration in Plants": [
+        "Glycolysis & Fermentation",
+        "Aerobic Respiration: Krebs' Cycle",
+        "Electron Transport System (ETS) and Oxidative Phosphorylation",
+        "The Respiratory Balance Sheet & Amphibolic Pathway",
+        "Respiratory Quotient"
+    ],
+    "Plant Growth and Development": [
+        "Growth, Differentiation, Development",
+        "Plant Growth Regulators (PGRs)",
+        "Photoperiodism & Vernalisation"
+    ],
+    // Class 12
+    "Sexual Reproduction in Flowering Plants": [
+        "Flower structure & Pre-fertilisation Events",
+        "Double Fertilisation",
+        "Post-fertilisation: Structures and Events",
+        "Apomixis and Polyembryony"
+    ],
+    "Principles of Inheritance and Variation": [
+        "Mendel's Laws of Inheritance",
+        "Inheritance of One Gene & Two Genes",
+        "Deviations from Mendelism",
+        "Chromosome Theory of Inheritance",
+        "Linkage and Recombination",
+        "Sex Determination & Mutation",
+        "Genetic Disorders: Pedigree Analysis, Mendelian & Chromosomal disorders"
+    ],
+    "Molecular Basis of Inheritance": [
+        "The DNA & RNA World",
+        "Packaging of DNA Helix",
+        "The Search for Genetic Material & Replication",
+        "Transcription & Genetic Code",
+        "Translation & Regulation of Gene Expression",
+        "Human Genome Project & DNA Fingerprinting"
+    ],
+    "Microbes in Human Welfare": [
+        "Microbes in Household Products & Industrial Products",
+        "Microbes in Sewage Treatment & Production of Biogas",
+        "Microbes as Biocontrol Agents & Biofertilisers"
+    ],
+    "Biotechnology: Principles and Processes": [
+        "Principles of Biotechnology",
+        "Tools of Recombinant DNA Technology",
+        "Processes of Recombinant DNA Technology"
+    ],
+    "Biotechnology and its Applications": [
+        "Biotechnological Applications in Agriculture",
+        "Biotechnological Applications in Medicine",
+        "Transgenic Animals & Ethical Issues"
+    ],
+    "Organisms and Populations": [
+        "Organism and Its Environment",
+        "Populations & Population Interactions"
+    ],
+    "Ecosystem": [
+        "Ecosystem-Structure and Function",
+        "Productivity and Decomposition",
+        "Energy Flow & Ecological Pyramids",
+        "Ecological Succession & Nutrient Cycling"
+    ],
+    "Biodiversity and Conservation": [
+        "Biodiversity: Concept, Patterns, Importance",
+        "Loss of Biodiversity & Biodiversity Conservation"
+    ]
   },
   Zoology: {
-    "Animal Kingdom": ["Basis of classification", "Classification of Non-chordates (Phyla)", "Classification of Chordates (Classes)", "Salient features and examples"],
-    "Structural Organisation in Animals": ["Animal tissues: Epithelial, Connective, Muscular, Neural", "Morphology and anatomy of Cockroach"],
-    "Biomolecules": ["Proteins and Amino acids", "Carbohydrates", "Lipids", "Nucleic Acids", "Enzymes: types, properties, action"],
-    "Digestion and Absorption": ["Alimentary canal and digestive glands", "Digestion of food and role of enzymes", "Absorption and assimilation", "Nutritional and digestive disorders"],
-    "Breathing and Exchange of Gases": ["Human respiratory system", "Mechanism of breathing", "Exchange and transport of gases", "Regulation of respiration & Respiratory volumes", "Disorders of respiratory system"],
-    "Body Fluids and Circulation": ["Blood, blood groups, coagulation", "Lymph and its function", "Human circulatory system, Heart structure", "Cardiac cycle, ECG, Double circulation", "Disorders of circulatory system"],
-    "Excretory Products and their Elimination": ["Modes of excretion", "Human excretory system: structure and function", "Urine formation & Osmoregulation", "Regulation of kidney function", "Role of other organs in excretion", "Disorders of excretory system"],
-    "Locomotion and Movement": ["Types of movement", "Muscle, skeletal muscle, muscle contraction", "Skeletal system and its functions", "Joints & Disorders of muscular and skeletal system"],
-    "Neural Control and Coordination": ["Neuron and nerves", "Human nervous system (CNS, PNS)", "Generation and conduction of nerve impulse", "Sense organs: Eye and Ear"],
-    "Chemical Coordination and Integration": ["Endocrine glands and hormones", "Human endocrine system", "Mechanism of hormone action", "Hypoactivity and hyperactivity related disorders"],
-    "Human Reproduction": ["Male and female reproductive systems", "Gametogenesis (Spermatogenesis & Oogenesis)", "Menstrual cycle", "Fertilisation, implantation, pregnancy", "Parturition and lactation"],
-    "Reproductive Health": ["Need for reproductive health", "Sexually transmitted diseases (STDs)", "Birth control methods", "Infertility and assisted reproductive technologies (ART)"],
-    "Human Health and Disease": ["Common diseases in humans", "Pathogens and parasites", "Immunology: Basic concepts, vaccines", "Cancer, HIV and AIDS", "Drugs and alcohol abuse"],
-    "Evolution": ["Origin of life & Evidences for evolution", "Darwinism & Modern synthetic theory", "Mechanism of evolution: Variation, Natural selection", "Hardy-Weinberg principle", "Adaptive Radiation & Human evolution"],
-    "Animal Husbandry": ["Management of farms and farm animals", "Animal breeding", "Apiculture (Bee-keeping)"],
+    // Class 11
+    "Animal Kingdom": [
+        "Basis of Classification",
+        "Phylum Porifera",
+        "Phylum Coelenterata (Cnidaria)",
+        "Phylum Ctenophora",
+        "Phylum Platyhelminthes",
+        "Phylum Aschelminthes",
+        "Phylum Annelida",
+        "Phylum Arthropoda",
+        "Phylum Mollusca",
+        "Phylum Echinodermata",
+        "Phylum Hemichordata",
+        "Phylum Chordata",
+        "Class Cyclostomata",
+        "Class Chondrichthyes",
+        "Class Osteichthyes",
+        "Class Amphibia",
+        "Class Reptilia",
+        "Class Aves",
+        "Class Mammalia"
+    ],
+    "Structural Organisation in Animals": [
+        "Epithelial Tissue",
+        "Connective Tissue",
+        "Muscle Tissue",
+        "Neural Tissue",
+        "Organ and Organ System",
+        "Morphology and Anatomy of Frog"
+    ],
+    "Biomolecules": [
+        "How to Analyse Chemical Composition?",
+        "Primary and Secondary Metabolites",
+        "Biomacromolecules",
+        "Proteins and Amino Acids",
+        "Polysaccharides",
+        "Nucleic Acids",
+        "Structure of Proteins",
+        "Nature of Bond Linking Monomers in a Polymer",
+        "Dynamic State of Body Constituents – Concept of Metabolism",
+        "Metabolic Basis for Living",
+        "The Living State",
+        "Enzymes"
+    ],
+    "Breathing and Exchange of Gases": [
+        "Respiratory Organs",
+        "Human Respiratory System",
+        "Mechanism of Breathing",
+        "Respiratory Volumes and Capacities",
+        "Exchange of Gases",
+        "Transport of Gases",
+        "Regulation of Respiration",
+        "Disorders of Respiratory System"
+    ],
+    "Body Fluids and Circulation": [
+        "Blood and Lymph",
+        "Blood Groups",
+        "Coagulation of Blood",
+        "Human Circulatory System",
+        "Cardiac Cycle",
+        "Electrocardiograph (ECG)",
+        "Double Circulation",
+        "Regulation of Cardiac Activity",
+        "Disorders of Circulatory System"
+    ],
+    "Excretory Products and their Elimination": [
+        "Human Excretory System",
+        "Urine Formation",
+        "Function of the Tubules",
+        "Mechanism of Concentration of the Filtrate",
+        "Regulation of Kidney Function",
+        "Micturition",
+        "Role of other Organs in Excretion",
+        "Disorders of the Excretory System"
+    ],
+    "Locomotion and Movement": [
+        "Types of Movement",
+        "Muscle",
+        "Skeletal System",
+        "Joints",
+        "Disorders of Muscular and Skeletal System"
+    ],
+    "Neural Control and Coordination": [
+        "Neural System",
+        "Human Neural System",
+        "Neuron as Structural and Functional Unit of Neural System",
+        "Central Neural System",
+        "Reflex Action and Reflex Arc",
+        "Sensory Reception and Processing (Eye and Ear)"
+    ],
+    "Chemical Coordination and Integration": [
+        "Endocrine Glands and Hormones",
+        "Human Endocrine System (Hypothalamus, Pituitary, Pineal, Thyroid, Parathyroid, Thymus, Adrenal, Pancreas, Gonads)",
+        "Hormones of Heart, Kidney and Gastrointestinal Tract",
+        "Mechanism of Hormone Action"
+    ],
+    // Class 12
+    "Human Reproduction": [
+        "The Male Reproductive System",
+        "The Female Reproductive System",
+        "Gametogenesis",
+        "Menstrual Cycle",
+        "Fertilisation and Implantation",
+        "Pregnancy and Embryonic Development",
+        "Parturition and Lactation"
+    ],
+    "Reproductive Health": [
+        "Reproductive Health – Problems and Strategies",
+        "Population Stabilisation and Birth Control",
+        "Medical Termination of Pregnancy",
+        "Sexually Transmitted Infections (STIs)",
+        "Infertility"
+    ],
+    "Human Health and Disease": [
+        "Common Diseases in Humans",
+        "Immunity",
+        "AIDS and Cancer",
+        "Drugs and Alcohol Abuse"
+    ],
+    "Evolution": [
+        "Origin of Life",
+        "Evidences for Evolution",
+        "What are the Evidences for Evolution?",
+        "What is Adaptive Radiation?",
+        "Biological Evolution",
+        "Mechanism of Evolution",
+        "Hardy-Weinberg Principle",
+        "A Brief Account of Evolution",
+        "Origin and Evolution of Man"
+    ]
   },
 };

@@ -561,6 +561,100 @@ const ViewAnalysisModal: React.FC<{ test: TestPlan | null, onClose: () => void }
     );
 }
 
+const ChapterRevisionModal: React.FC<{
+    chapterInfo: { test: TestPlan; subject: SubjectName; chapter: string } | null;
+    onClose: () => void;
+    onConfirm: (difficulty: number) => void;
+}> = ({ chapterInfo, onClose, onConfirm }) => {
+    const [difficulty, setDifficulty] = useState(3);
+
+    useEffect(() => {
+        setDifficulty(3);
+    }, [chapterInfo]);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onConfirm(difficulty);
+    };
+
+    if (!chapterInfo) return null;
+
+    return (
+        <Modal isOpen={!!chapterInfo} onClose={onClose} title={`Revise Chapter: ${chapterInfo.chapter}`}>
+            <form onSubmit={handleSubmit}>
+                <label className="block mb-2">How difficult was this chapter? (1: Easy - 5: Hard)</label>
+                <div className="flex items-center gap-4 my-4">
+                    <span>1</span>
+                    <input type="range" min="1" max="5" value={difficulty} onChange={e => setDifficulty(Number(e.target.value))} className="w-full" />
+                    <span>5</span>
+                    <span className="font-bold text-brand-cyan-400 w-4">{difficulty}</span>
+                </div>
+                <div className="flex justify-end gap-2 mt-6">
+                    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button type="submit">Save Revision</Button>
+                </div>
+            </form>
+        </Modal>
+    );
+};
+
+const ChapterPracticeModal: React.FC<{
+    chapterInfo: { test: TestPlan; subject: SubjectName; chapter: string } | null;
+    onClose: () => void;
+    onConfirm: (total: number, correct: number, incorrect: number) => void;
+}> = ({ chapterInfo, onClose, onConfirm }) => {
+    const [total, setTotal] = useState('');
+    const [correct, setCorrect] = useState('');
+    const [incorrect, setIncorrect] = useState('');
+
+    useEffect(() => {
+        setTotal('');
+        setCorrect('');
+        setIncorrect('');
+    }, [chapterInfo]);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const totalNum = Number(total);
+        const correctNum = Number(correct);
+        const incorrectNum = Number(incorrect || 0);
+
+        if (totalNum > 0 && correctNum >= 0 && incorrectNum >= 0 && (correctNum + incorrectNum <= totalNum)) {
+            onConfirm(totalNum, correctNum, incorrectNum);
+        } else {
+            alert("Please check your numbers. Correct + Incorrect answers must not exceed the total questions attempted.");
+        }
+    };
+
+    if (!chapterInfo) return null;
+
+    return (
+        <Modal isOpen={!!chapterInfo} onClose={onClose} title={`Practice Chapter: ${chapterInfo.chapter}`}>
+            <form onSubmit={handleSubmit}>
+                <p className="text-sm text-gray-300 mb-4">Enter the results for your practice session on this chapter. This will be logged for all topics within it.</p>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block mb-1">Total Questions Attempted</label>
+                        <Input type="number" value={total} onChange={e => setTotal(e.target.value)} min="1" required />
+                    </div>
+                    <div>
+                        <label className="block mb-1">Number of Correct Answers</label>
+                        <Input type="number" value={correct} onChange={e => setCorrect(e.target.value)} min="0" max={total || undefined} required />
+                    </div>
+                    <div>
+                        <label className="block mb-1">Number of Incorrect Answers</label>
+                        <Input type="number" value={incorrect} onChange={e => setIncorrect(e.target.value)} min="0" max={total && correct ? String(Number(total) - Number(correct)) : undefined} />
+                    </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-6">
+                    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button type="submit">Save Practice</Button>
+                </div>
+            </form>
+        </Modal>
+    );
+};
+
 
 interface TestPlannerProps {
     tasks: Task[];
@@ -582,6 +676,9 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, setTasks, testPlans, s
     const [expandedTest, setExpandedTest] = useState<string | null>(null);
     const [expandedCompletedTest, setExpandedCompletedTest] = useState<string | null>(null);
     const [initialDurationForAnalysis, setInitialDurationForAnalysis] = useState(0);
+    const [chapterToRevise, setChapterToRevise] = useState<{ test: TestPlan; subject: SubjectName; chapter: string } | null>(null);
+    const [chapterToPractice, setChapterToPractice] = useState<{ test: TestPlan; subject: SubjectName; chapter: string } | null>(null);
+
 
     useEffect(() => {
         if (completedTestInfo) {
@@ -763,6 +860,60 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, setTasks, testPlans, s
         startPrepTimer(newTask);
     };
 
+    const handleConfirmChapterRevision = (difficulty: number) => {
+        if (!chapterToRevise) return;
+        const { test, subject, chapter } = chapterToRevise;
+
+        setTestPlans(prevTests => 
+            prevTests.map(t => {
+                if (t.id === test.id) {
+                    const updatedTopicStatus = t.topicStatus.map(topic => {
+                        if (topic.subject === subject && topic.chapter === chapter) {
+                            return { ...topic, revisionDifficulty: difficulty };
+                        }
+                        return topic;
+                    });
+                    return { ...t, topicStatus: updatedTopicStatus };
+                }
+                return t;
+            })
+        );
+        setChapterToRevise(null);
+    };
+
+    const handleConfirmChapterPractice = (total: number, correct: number, incorrect: number) => {
+        if (!chapterToPractice) return;
+        const { test, subject, chapter } = chapterToPractice;
+
+        setTestPlans(prevTests => 
+            prevTests.map(t => {
+                if (t.id === test.id) {
+                    const newAttempt: TopicPracticeAttempt = {
+                        id: crypto.randomUUID(),
+                        totalQuestions: total,
+                        correctAnswers: correct,
+                        incorrectAnswers: incorrect,
+                        duration: 0, // No timer for this action
+                    };
+
+                    const updatedTopicStatus = t.topicStatus.map(topic => {
+                        if (topic.subject === subject && topic.chapter === chapter) {
+                            return { 
+                                ...topic, 
+                                practiceAttempts: [...topic.practiceAttempts, newAttempt] 
+                            };
+                        }
+                        return topic;
+                    });
+                    return { ...t, topicStatus: updatedTopicStatus };
+                }
+                return t;
+            })
+        );
+        setChapterToPractice(null);
+    };
+
+
     return (
         <div>
             <div className="flex justify-between items-center mb-8">
@@ -841,8 +992,18 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, setTasks, testPlans, s
                                                                 {Object.keys(groupedTopics[subject]).map(chapter => (
                                                                     <React.Fragment key={chapter}>
                                                                         <tr className="bg-black/40">
-                                                                            <td colSpan={3} className="py-1.5 px-3 font-semibold text-gray-300 pl-6">
+                                                                            <td className="py-1.5 px-3 font-semibold text-gray-300 pl-6">
                                                                                 {chapter}
+                                                                            </td>
+                                                                            <td colSpan={2} className="py-1.5 px-3 text-right">
+                                                                                <div className="flex justify-end items-center gap-1">
+                                                                                    <Button variant="ghost" size="sm" onClick={() => setChapterToRevise({ test, subject, chapter })} disabled={!!activeTimer} title="Mark all topics in this chapter as revised">
+                                                                                        <BrainIcon className="w-4 h-4 mr-1"/>Revise All
+                                                                                    </Button>
+                                                                                    <Button variant="ghost" size="sm" onClick={() => setChapterToPractice({ test, subject, chapter })} disabled={!!activeTimer} title="Log a practice session for all topics in this chapter">
+                                                                                        <ClipboardCheckIcon className="w-4 h-4 mr-1"/>Practice All
+                                                                                    </Button>
+                                                                                </div>
                                                                             </td>
                                                                         </tr>
                                                                         {groupedTopics[subject][chapter].map(topic => {
@@ -957,6 +1118,16 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, setTasks, testPlans, s
                 onComplete={completeTest} 
             />
             <ViewAnalysisModal test={viewingTest} onClose={() => setViewingTest(null)} />
+            <ChapterRevisionModal 
+                chapterInfo={chapterToRevise}
+                onClose={() => setChapterToRevise(null)}
+                onConfirm={handleConfirmChapterRevision}
+            />
+            <ChapterPracticeModal 
+                chapterInfo={chapterToPractice}
+                onClose={() => setChapterToPractice(null)}
+                onConfirm={handleConfirmChapterPractice}
+            />
         </div>
     );
 };

@@ -278,7 +278,6 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
         });
 
         // --- Completion Streak (All tasks on a day completed) ---
-        // FIX: By providing a typed initial value, the type of the accumulator `acc` is correctly inferred.
         const tasksByDate = tasks.reduce((acc: Record<string, Task[]>, task) => {
             const dateStr = task.date;
             if (!acc[dateStr]) {
@@ -319,9 +318,10 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
         }
         
         // --- Study Streak (At least one task session on a day) ---
+        // FIX: The original `reduce` had type inference issues, causing `unknown[]`. Replaced with a more robust version that explicitly types the accumulator in the callback and the initial value to ensure the result is correctly typed as `StudySession[]`.
         const studyDays: string[] = [...new Set(
             completedTasks
-                .reduce((acc, t) => acc.concat(t.sessions || []), [] as StudySession[])
+                .reduce((acc: StudySession[], t) => acc.concat(t.sessions || []), [] as StudySession[])
                 .map(s => s.date.split('T')[0])
         )].sort();
         let consistencyStreak = 0;
