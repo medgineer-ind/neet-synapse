@@ -14,7 +14,7 @@ interface InsightsProps {
 
 const InsightCard: React.FC<{ title: string; icon: React.ReactNode; children: React.ReactNode; colorClass: string }> = ({ title, icon, children, colorClass }) => (
     <Card className={cn("p-6 border-l-4", colorClass)}>
-        <h2 className="flex items-center gap-3 text-xl font-bold text-brand-cyan-400 mb-4">
+        <h2 className="flex items-center gap-3 font-display text-2xl font-bold text-brand-amber-400 mb-4 tracking-wide">
             {icon}
             {title}
         </h2>
@@ -46,7 +46,6 @@ const Insights: React.FC<InsightsProps> = ({ tasks, testPlans, targetScore }) =>
     const pastInsights = useMemo(() => {
         if (completedTasks.length < 10) return null;
 
-        // --- Top 5 Peak Performance Days ---
         const dailyTotals: { [date: string]: number } = {};
         completedTasks.forEach(task => {
             task.sessions.forEach(session => {
@@ -59,7 +58,6 @@ const Insights: React.FC<InsightsProps> = ({ tasks, testPlans, targetScore }) =>
             .slice(0, 5)
             .map(([date, duration]) => ({ date, duration }));
 
-        // --- Biggest Breakthrough (by Chapter per Subject) ---
         const sortedTasks = [...completedTasks].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         const midPointIndex = Math.floor(sortedTasks.length / 2);
         const firstHalf = sortedTasks.slice(0, midPointIndex);
@@ -67,7 +65,6 @@ const Insights: React.FC<InsightsProps> = ({ tasks, testPlans, targetScore }) =>
         
         const breakthroughsBySubject: { [key in SubjectName]?: { chapter: string; change: number }[] } = {};
 
-        // Helper to efficiently group tasks by subject and chapter
         const groupTasks = (taskSet: Task[]) => {
             return taskSet.reduce((acc, task) => {
                 if (!acc[task.subject]) acc[task.subject] = {};
@@ -108,7 +105,7 @@ const Insights: React.FC<InsightsProps> = ({ tasks, testPlans, targetScore }) =>
 
                 if (firstScore !== null && secondScore !== null) {
                     const change = secondScore - firstScore;
-                    if (change > 5) { // Only show meaningful improvements
+                    if (change > 5) { 
                         chapterImprovements.push({ chapter: chapterName, change });
                     }
                 }
@@ -120,7 +117,6 @@ const Insights: React.FC<InsightsProps> = ({ tasks, testPlans, targetScore }) =>
         });
 
 
-        // --- Most Practiced Chapters (by Subject) ---
         const mostPracticedBySubject: { [key in SubjectName]?: { chapter: string; count: number }[] } = {};
         const practiceTasks = completedTasks.filter(t => t.taskType === 'Practice' && t.totalQuestions && t.totalQuestions > 0);
 
@@ -156,7 +152,6 @@ const Insights: React.FC<InsightsProps> = ({ tasks, testPlans, targetScore }) =>
 
         if (recentTasks.length === 0) return null;
 
-        // Current Strongest Subject
         const subjectScores: { [key in SubjectName]?: { total: number; count: number } } = {};
         recentTasks.forEach(task => {
             if (!subjectScores[task.subject]) subjectScores[task.subject] = { total: 0, count: 0 };
@@ -171,23 +166,21 @@ const Insights: React.FC<InsightsProps> = ({ tasks, testPlans, targetScore }) =>
             .map(([name, data]) => ({ name, score: data.count > 0 ? data.total / data.count : 0 }))
             .sort((a, b) => b.score - a.score)[0];
 
-        // Most Critical Topic
         let criticalTopic: { name: string; chapter: string; subject: SubjectName; score: number } | null = null;
         let minScore = 100;
-        let maxChapterSize = 0;
+        let maxChapterWeight = 0; // Consider chapter size as weight
 
         (Object.keys(progressStats.subjects) as SubjectName[]).forEach(subject => {
             Object.values(progressStats.subjects[subject].chapters).forEach(chapter => {
+                 const chapterWeight = Object.keys((chapter as ChapterStats).microtopics).length;
                 Object.entries((chapter as ChapterStats).microtopics).forEach(([microtopicName, microtopic]) => {
                     const stats = microtopic as MicrotopicStats;
                     const score = calculateOverallScore(stats.avgDifficulty, stats.avgAccuracy);
-                    const chapterSize = Object.keys((chapter as ChapterStats).microtopics).length;
-
+                   
                     if (stats.completed > 0 && score < 50) {
-                        // Prioritize larger chapters with low scores
-                        if (score < minScore || (score === minScore && chapterSize > maxChapterSize)) {
+                        if (score < minScore || (score === minScore && chapterWeight > maxChapterWeight)) {
                             minScore = score;
-                            maxChapterSize = chapterSize;
+                            maxChapterWeight = chapterWeight;
                             criticalTopic = { name: microtopicName, chapter: (chapter as any).name, subject: subject, score };
                         }
                     }
@@ -209,20 +202,17 @@ const Insights: React.FC<InsightsProps> = ({ tasks, testPlans, targetScore }) =>
         
         if (!lastTest || !lastTest.analysis || !presentInsights?.criticalTopic) return null;
 
-        // Projected Score Trajectory
         const { criticalTopic } = presentInsights;
         const currentScore = lastTest.analysis.marksObtained || 0;
         const subjectPerf = lastTest.analysis.subjectWisePerformance?.[criticalTopic.subject];
         let projectedScore = currentScore;
         
         if (subjectPerf && subjectPerf.totalQuestions > 0) {
-            // Assume improving the critical topic contributes to improving 15% of the incorrect questions in that subject
             const questionsToImprove = Math.ceil(subjectPerf.incorrect * 0.15);
-            const scoreGain = (questionsToImprove * 4) + (questionsToImprove * 1); // Gain 4 for correct, avoid -1 for incorrect
+            const scoreGain = (questionsToImprove * 4) + (questionsToImprove * 1);
             projectedScore = Math.min(720, currentScore + scoreGain);
         }
 
-        // Roadmap to Target
         const scoreGap = targetScore - currentScore;
         if (scoreGap <= 0) return { projectedScore, roadmap: [], lastTestScore: currentScore };
         
@@ -243,13 +233,13 @@ const Insights: React.FC<InsightsProps> = ({ tasks, testPlans, targetScore }) =>
 
     return (
         <div className="space-y-8">
-            <h1 className="text-3xl font-bold text-brand-cyan-400">Temporal Insight Engine</h1>
+            <h1 className="font-display text-4xl font-bold text-brand-amber-400 tracking-wide">Temporal Insight Engine</h1>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <InsightCard title="Preparation Rewind" icon={<HistoryIcon />} colorClass="border-blue-500">
+                <InsightCard title="Preparation Rewind" icon={<HistoryIcon />} colorClass="border-blue-500/50">
                     {pastInsights ? (
                         <>
                             <div>
-                                <h3 className="font-semibold text-gray-200 mb-2 flex items-center gap-2"><ClockIcon className="w-5 h-5 text-yellow-300" /> Top 5 Peak Performance Days</h3>
+                                <h3 className="font-display font-semibold text-gray-200 mb-2 flex items-center gap-2"><ClockIcon className="w-5 h-5 text-yellow-300" /> Top 5 Peak Performance Days</h3>
                                 {pastInsights.peakDays.length > 0 ? (
                                     <ul className="space-y-2 text-sm">
                                         {pastInsights.peakDays.map((day, index) => (
@@ -263,12 +253,12 @@ const Insights: React.FC<InsightsProps> = ({ tasks, testPlans, targetScore }) =>
                             </div>
 
                             <div className="border-t border-white/10 pt-4 mt-4">
-                                <h3 className="font-semibold text-gray-200 mb-2 flex items-center gap-2"><TrendingUpIcon className="w-5 h-5 text-green-400" /> Biggest Breakthroughs (by Chapter)</h3>
+                                <h3 className="font-display font-semibold text-gray-200 mb-2 flex items-center gap-2"><TrendingUpIcon className="w-5 h-5 text-green-400" /> Biggest Breakthroughs</h3>
                                 <div className="space-y-3">
                                     {Object.keys(pastInsights.breakthroughsBySubject).length > 0 ? (
                                         (Object.keys(pastInsights.breakthroughsBySubject) as SubjectName[]).map(subject => (
                                             <div key={subject}>
-                                                <h4 className="font-bold text-sm text-brand-cyan-300">{subject}</h4>
+                                                <h4 className="font-bold text-sm text-brand-amber-300">{subject}</h4>
                                                 <ul className="text-xs space-y-1 mt-1 pl-2">
                                                     {pastInsights.breakthroughsBySubject[subject]?.map((item, idx) => (
                                                         <li key={idx}>
@@ -283,16 +273,16 @@ const Insights: React.FC<InsightsProps> = ({ tasks, testPlans, targetScore }) =>
                             </div>
 
                             <div className="border-t border-white/10 pt-4 mt-4">
-                                <h3 className="font-semibold text-gray-200 mb-2 flex items-center gap-2"><TargetIcon className="w-5 h-5 text-purple-400" /> Most Practiced Chapters</h3>
+                                <h3 className="font-display font-semibold text-gray-200 mb-2 flex items-center gap-2"><TargetIcon className="w-5 h-5 text-brand-orange-400" /> Most Practiced Chapters</h3>
                                 <div className="space-y-3">
                                      {Object.keys(pastInsights.mostPracticedBySubject).length > 0 ? (
                                         (Object.keys(pastInsights.mostPracticedBySubject) as SubjectName[]).map(subject => (
                                              <div key={subject}>
-                                                <h4 className="font-bold text-sm text-brand-cyan-300">{subject}</h4>
+                                                <h4 className="font-bold text-sm text-brand-amber-300">{subject}</h4>
                                                  <ul className="text-xs space-y-1 mt-1 pl-2">
                                                     {pastInsights.mostPracticedBySubject[subject]?.map((item, idx) => (
                                                         <li key={idx}>
-                                                            {item.chapter}: <span className="text-purple-300 font-semibold">{item.count} Questions</span>
+                                                            {item.chapter}: <span className="text-brand-orange-400 font-semibold">{item.count} Questions</span>
                                                         </li>
                                                     ))}
                                                 </ul>
@@ -307,7 +297,7 @@ const Insights: React.FC<InsightsProps> = ({ tasks, testPlans, targetScore }) =>
                     )}
                 </InsightCard>
 
-                <InsightCard title="Current Snapshot" icon={<CrosshairIcon />} colorClass="border-yellow-500">
+                <InsightCard title="Current Snapshot" icon={<CrosshairIcon />} colorClass="border-yellow-500/50">
                      {presentInsights ? <>
                         <InfoPill label="Current Strongest Subject" value={presentInsights.strongestSubjectName} subtext={`Score: ${presentInsights.strongestSubjectScore.toFixed(1)}/100 (last 14 days)`} icon={<TrendingUpIcon className="w-5 h-5 text-green-400" />} />
                         <div className="p-3 bg-red-900/40 rounded-lg border border-red-500/50">
@@ -326,24 +316,24 @@ const Insights: React.FC<InsightsProps> = ({ tasks, testPlans, targetScore }) =>
                     </> : <p className="text-gray-400">Log some tasks from the last 14 days to see your current snapshot.</p>}
                 </InsightCard>
 
-                <InsightCard title="Future Projections" icon={<TrendingUpIcon />} colorClass="border-green-500">
+                <InsightCard title="Future Projections" icon={<TrendingUpIcon />} colorClass="border-green-500/50">
                     {futureInsights ? <>
                         <div className="text-center">
                             <p className="text-sm text-gray-400">By mastering your critical topic, your score could improve:</p>
                             <div className="flex items-center justify-center gap-4 my-2">
                                 <div className="text-center">
                                     <p className="text-xs text-gray-500">Last Test</p>
-                                    <p className="text-3xl font-bold text-brand-cyan-300">{futureInsights.lastTestScore}</p>
+                                    <p className="font-display text-3xl font-bold text-brand-amber-300">{futureInsights.lastTestScore}</p>
                                 </div>
                                 <TrendingUpIcon className="w-8 h-8 text-green-400" />
                                 <div className="text-center">
                                     <p className="text-xs text-gray-500">Potential</p>
-                                    <p className="text-3xl font-bold text-green-400">{futureInsights.projectedScore.toFixed(0)}</p>
+                                    <p className="font-display text-3xl font-bold text-green-400">{futureInsights.projectedScore.toFixed(0)}</p>
                                 </div>
                             </div>
                         </div>
                         <div className="border-t border-white/10 pt-4">
-                            <h3 className="font-semibold mb-2">Roadmap to Target ({targetScore})</h3>
+                            <h3 className="font-display font-semibold mb-2">Roadmap to Target ({targetScore})</h3>
                             {futureInsights.roadmap.length > 0 ? (
                                 <ul className="space-y-2 text-sm">
                                     {futureInsights.roadmap.map(({ subject, potentialGain }) => (

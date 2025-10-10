@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { formatDurationForInput, parseDurationFromInput, formatDuration } from '../../lib/utils';
 import { Input } from './StyledComponents';
@@ -19,7 +18,7 @@ export const TimeEditor: React.FC<{ initialDuration: number; onDurationChange: (
 
     return (
         <div className="space-y-2 border-t border-white/10 pt-4 mt-4">
-            <label className="block text-sm font-medium mb-1">{label}</label>
+            <label className="block font-display text-lg mb-1">{label}</label>
             <Input
                 type="text"
                 value={timeString}

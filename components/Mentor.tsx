@@ -57,8 +57,8 @@ const DailyReport: React.FC<{ reportData: any }> = ({ reportData }) => {
     const { weakestSubject, weakTopics, strongTopics, activeDaysLast7, lastTest, targetScore } = reportData;
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fadeIn">
-            <div className="p-4 bg-black/30 rounded-lg">
-                <h3 className="flex items-center gap-2 font-semibold text-red-400 mb-3"><LightbulbIcon className="w-5 h-5"/> Today's Top Priorities</h3>
+            <Card className="p-4 bg-black/30 rounded-lg border-l-4 border-red-500/50">
+                <h3 className="flex items-center gap-2 font-display font-semibold text-red-400 mb-3"><LightbulbIcon className="w-5 h-5"/> Today's Top Priorities</h3>
                 {weakestSubject && weakTopics.length > 0 ? (
                     <>
                         <p className="text-sm text-gray-300 mb-2">Your data suggests focusing on <strong className="text-white">{weakestSubject}</strong>. Start with these topics:</p>
@@ -73,9 +73,9 @@ const DailyReport: React.FC<{ reportData: any }> = ({ reportData }) => {
                         </ul>
                     </>
                 ) : <p className="text-sm text-gray-400">Great work! No specific weak areas detected today. Review any topic you feel needs a touch-up.</p>}
-            </div>
-             <div className="p-4 bg-black/30 rounded-lg">
-                <h3 className="flex items-center gap-2 font-semibold text-green-400 mb-3"><TrendingUpIcon className="w-5 h-5"/> Sharpen Your Strengths</h3>
+            </Card>
+             <Card className="p-4 bg-black/30 rounded-lg border-l-4 border-green-500/50">
+                <h3 className="flex items-center gap-2 font-display font-semibold text-green-400 mb-3"><TrendingUpIcon className="w-5 h-5"/> Sharpen Your Strengths</h3>
                 {strongTopics.length > 0 ? (
                      <>
                         <p className="text-sm text-gray-300 mb-2">You're performing well in these topics. Solidify your knowledge to turn them into guaranteed scores!</p>
@@ -97,18 +97,18 @@ const DailyReport: React.FC<{ reportData: any }> = ({ reportData }) => {
                     </>
                 ) : <p className="text-sm text-gray-400">Complete some tasks to identify and build upon your strengths.</p>}
                 <div className="border-t border-white/10 mt-4 pt-4">
-                     <h3 className="flex items-center gap-2 font-semibold text-yellow-400 mb-3"><RepeatIcon className="w-5 h-5"/> Consistency Check</h3>
+                     <h3 className="flex items-center gap-2 font-display font-semibold text-yellow-400 mb-3"><RepeatIcon className="w-5 h-5"/> Consistency Check</h3>
                      <p className="text-sm text-gray-300">You've had <strong className="text-white">{activeDaysLast7} active study days</strong> in the last 7 days. {activeDaysLast7 >= 5 ? "Excellent momentum! Keep it up." : "Consistency is key. Try to study a little every day."}</p>
                 </div>
-            </div>
-             <div className="p-4 bg-black/30 rounded-lg">
-                <h3 className="flex items-center gap-2 font-semibold text-brand-cyan-400 mb-3"><TrophyIcon className="w-5 h-5"/> Target Guidance</h3>
+            </Card>
+             <Card className="p-4 bg-black/30 rounded-lg border-l-4 border-brand-amber-500/50">
+                <h3 className="flex items-center gap-2 font-display font-semibold text-brand-amber-400 mb-3"><TrophyIcon className="w-5 h-5"/> Target Guidance</h3>
                 {lastTest && lastTest.analysis ? (
                      <>
                         <p className="text-sm text-gray-300">Your last test was <strong className="text-white">"{lastTest.name}"</strong>.</p>
                         <div className="text-center my-4">
                             <p className="text-gray-400">Your Score</p>
-                            <p className="text-3xl font-bold text-brand-cyan-300">{lastTest.analysis.marksObtained} / {lastTest.analysis.totalMarks}</p>
+                            <p className="text-3xl font-bold text-brand-amber-300">{lastTest.analysis.marksObtained} / {lastTest.analysis.totalMarks}</p>
                         </div>
                          <div className="text-center">
                             <p className="text-gray-400">Your Target</p>
@@ -120,7 +120,7 @@ const DailyReport: React.FC<{ reportData: any }> = ({ reportData }) => {
                         </div>
                     </>
                 ) : <p className="text-sm text-gray-400">Complete a mock test and log the analysis to get personalized guidance towards your target score of <strong className="text-white">{targetScore}</strong>.</p>}
-            </div>
+            </Card>
         </div>
     );
 };
@@ -133,35 +133,35 @@ const WeeklySummary: React.FC<{ reportData: any }> = ({ reportData }) => {
     return (
         <div className="space-y-6 animate-fadeIn">
             <div className="flex flex-col md:flex-row gap-4">
-                <ReportStatCard icon={<ClockIcon className="w-5 h-5 text-brand-cyan-300"/>} label="Total Study Time" value={formatDuration(totalTime)} trend={timeTrend} trendLabel="vs. last week"/>
+                <ReportStatCard icon={<ClockIcon className="w-5 h-5 text-brand-amber-300"/>} label="Total Study Time" value={formatDuration(totalTime)} trend={timeTrend} trendLabel="vs. last week"/>
                 <ReportStatCard icon={<CheckCircleIcon className="w-5 h-5 text-green-400"/>} label="Tasks Completed" value={tasksCompleted} />
                 <ReportStatCard icon={<ActivityIcon className="w-5 h-5 text-yellow-400"/>} label="Active Days" value={`${activeDays} / 7`} />
             </div>
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="p-4 bg-black/30 rounded-lg">
-                    <h3 className="font-semibold text-green-400 mb-3">Top 5 Performing Topics</h3>
+                <Card className="p-4">
+                    <h3 className="font-display font-semibold text-green-400 mb-3">Top 5 Performing Topics</h3>
                     <div className="space-y-2">
                         {topPerformingTopics.length > 0 ? topPerformingTopics.map((topic: any) => (
                             <TopicListItem key={`${topic.subject}-${topic.chapter}-${topic.name}`} icon={<TrendingUpIcon className="w-5 h-5 text-green-400"/>} title={topic.name} subtitle={`${topic.chapter} (${topic.subject})`} score={topic.score} />
                         )) : <p className="text-sm text-gray-400">Not enough data.</p>}
                     </div>
-                </div>
-                <div className="p-4 bg-black/30 rounded-lg">
-                    <h3 className="font-semibold text-red-400 mb-3">5 Topics to Focus On</h3>
+                </Card>
+                <Card className="p-4">
+                    <h3 className="font-display font-semibold text-red-400 mb-3">5 Topics to Focus On</h3>
                     <div className="space-y-2">
                         {weakestTopics.length > 0 ? weakestTopics.map((topic: any) => (
                             <TopicListItem key={`${topic.subject}-${topic.chapter}-${topic.name}`} icon={<TrendingDownIcon className="w-5 h-5 text-red-400"/>} title={topic.name} subtitle={`${topic.chapter} (${topic.subject})`} score={topic.score} />
                         )) : <p className="text-sm text-gray-400">No specific weak topics found this week. Good job!</p>}
                     </div>
-                </div>
-                <div className="p-4 bg-black/30 rounded-lg">
-                    <h3 className="font-semibold text-brand-cyan-400 mb-3">Top 5 Most Studied Chapters</h3>
+                </Card>
+                <Card className="p-4">
+                    <h3 className="font-display font-semibold text-brand-amber-400 mb-3">Top 5 Most Studied Chapters</h3>
                     <div className="space-y-2">
                        {mostStudied.length > 0 ? mostStudied.map(([name, duration]: [string, number]) => (
                            <TopicListItem key={name} icon={<BookOpenIcon className="w-5 h-5 text-gray-300"/>} title={name} subtitle={formatDuration(duration)} />
                        )) : <p className="text-sm text-gray-400">Not enough data.</p>}
                     </div>
-                </div>
+                </Card>
             </div>
         </div>
     );
@@ -175,30 +175,30 @@ const MonthlyReview: React.FC<{ reportData: any }> = ({ reportData }) => {
     return (
         <div className="space-y-6 animate-fadeIn">
             <div className="flex flex-col md:flex-row gap-4">
-                <ReportStatCard icon={<ClockIcon className="w-5 h-5 text-brand-cyan-300"/>} label="Total Study Time" value={formatDuration(totalTime)} />
+                <ReportStatCard icon={<ClockIcon className="w-5 h-5 text-brand-amber-300"/>} label="Total Study Time" value={formatDuration(totalTime)} />
                 <ReportStatCard icon={<CheckCircleIcon className="w-5 h-5 text-green-400"/>} label="Tasks Completed" value={tasksCompleted} />
                 <ReportStatCard icon={<ActivityIcon className="w-5 h-5 text-yellow-400"/>} label="Active Days" value={`${activeDays} / 30`} />
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="p-4 bg-black/30 rounded-lg">
-                    <h3 className="font-semibold text-green-400 mb-3">Top 5 Strongest Chapters</h3>
+                <Card className="p-4">
+                    <h3 className="font-display font-semibold text-green-400 mb-3">Top 5 Strongest Chapters</h3>
                     <div className="space-y-2">
                         {topPerformingChapters.length > 0 ? topPerformingChapters.map((chapter: any) => (
                             <TopicListItem key={`${chapter.subject}-${chapter.name}`} icon={<TrendingUpIcon className="w-5 h-5 text-green-400"/>} title={chapter.name} subtitle={chapter.subject} score={chapter.score} />
                         )) : <p className="text-sm text-gray-400">Not enough data for this month.</p>}
                     </div>
-                </div>
-                <div className="p-4 bg-black/30 rounded-lg">
-                    <h3 className="font-semibold text-red-400 mb-3">5 Chapters to Focus On</h3>
+                </Card>
+                <Card className="p-4">
+                    <h3 className="font-display font-semibold text-red-400 mb-3">5 Chapters to Focus On</h3>
                     <div className="space-y-2">
                         {weakestChapters.length > 0 ? weakestChapters.map((chapter: any) => (
                             <TopicListItem key={`${chapter.subject}-${chapter.name}`} icon={<TrendingDownIcon className="w-5 h-5 text-red-400"/>} title={chapter.name} subtitle={chapter.subject} score={chapter.score} />
                         )) : <p className="text-sm text-gray-400">No specific chapters need urgent focus. Keep up the balanced work!</p>}
                     </div>
-                </div>
+                </Card>
             </div>
-             <div className="p-4 bg-black/30 rounded-lg">
-                <h3 className="font-semibold text-brand-cyan-400 mb-3">Monthly Test Performance</h3>
+             <Card className="p-4">
+                <h3 className="font-display font-semibold text-brand-amber-400 mb-3">Monthly Test Performance</h3>
                  {testCount > 0 ? (
                      <TopicListItem
                         icon={<TrophyIcon className="w-6 h-6 text-yellow-400"/>}
@@ -208,7 +208,7 @@ const MonthlyReview: React.FC<{ reportData: any }> = ({ reportData }) => {
                  ) : (
                     <p className="text-sm text-gray-400">No tests completed this month. Schedule one to track your progress!</p>
                  )}
-            </div>
+            </Card>
         </div>
     );
 };
@@ -480,30 +480,30 @@ const Mentor: React.FC<MentorProps> = ({ tasks, testPlans, targetScore, setTarge
 
     return (
         <div className="space-y-8">
-            <h1 className="text-3xl font-bold text-brand-cyan-400">Synapse AI Mentor</h1>
+            <h1 className="font-display text-4xl font-bold text-brand-amber-400 tracking-wide">Synapse AI Mentor</h1>
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <Card className="lg:col-span-2 p-6 flex flex-col md:flex-row items-center justify-center gap-8">
                     <div className="relative flex items-center justify-center w-52 h-52">
                         <svg className="w-full h-full" viewBox="0 0 180 180">
-                            <circle className="text-slate-900/50" strokeWidth="12" stroke="currentColor" fill="transparent" r={radius} cx="90" cy="90" />
-                            <circle className="text-brand-cyan-500 drop-shadow-[0_0_8px_rgba(0,239,255,0.7)]" strokeWidth="12" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" stroke="currentColor" fill="transparent" r={radius} cx="90" cy="90" transform="rotate(-90 90 90)" style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}/>
+                            <circle className="text-slate-800" strokeWidth="12" stroke="currentColor" fill="transparent" r={radius} cx="90" cy="90" />
+                            <circle className="text-brand-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.7)]" strokeWidth="12" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" stroke="currentColor" fill="transparent" r={radius} cx="90" cy="90" transform="rotate(-90 90 90)" style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}/>
                         </svg>
                         <div className="absolute flex flex-col items-center justify-center">
-                            <span className="text-5xl font-bold text-brand-cyan-400">{neetReadinessScore}</span>
+                            <span className="font-display text-5xl font-bold text-brand-amber-400">{neetReadinessScore}</span>
                             <span className="text-sm text-gray-400">/ 1000</span>
-                            <span className="text-lg font-semibold text-white mt-2">Readiness Score</span>
+                            <span className="font-display text-lg font-semibold text-white mt-2">Readiness Score</span>
                         </div>
                     </div>
                     <div className="text-center md:text-left">
-                        <p className="text-gray-400 text-lg">Projected Rank Tier</p>
-                        <p className={cn("text-4xl font-bold my-2", getScoreColorClass(neetReadinessScore/10))}>{rankTier}</p>
+                        <p className="font-display text-gray-400 text-lg">Projected Rank Tier</p>
+                        <p className={cn("font-display text-4xl font-bold my-2", getScoreColorClass(neetReadinessScore/10))}>{rankTier}</p>
                         <p className="text-sm text-gray-500 max-w-sm">This is an estimate based on your current syllabus coverage, knowledge depth, consistency, and test performance. Keep working hard to improve your score!</p>
                     </div>
                 </Card>
                 
                 <Card className="p-6">
-                    <h2 className="text-xl font-semibold text-brand-cyan-400 mb-4">My Target</h2>
+                    <h2 className="font-display text-2xl font-semibold text-brand-amber-400 mb-4">My Target</h2>
                     <p className="text-gray-400 mb-4">Set your dream score for the NEET exam to get personalized feedback.</p>
                      <div className="flex items-center gap-2">
                         <Input type="number" value={scoreInput} onChange={e => setScoreInput(e.target.value)} max={720} min={0} />
@@ -514,20 +514,20 @@ const Mentor: React.FC<MentorProps> = ({ tasks, testPlans, targetScore, setTarge
             </div>
             
             <Card className="p-6">
-                <h2 className="text-2xl font-bold text-brand-cyan-400 mb-4">Synapse Reports</h2>
+                <h2 className="font-display text-2xl font-bold text-brand-amber-400 mb-4">Synapse Reports</h2>
                  <div className="flex items-center bg-black/20 rounded-lg p-1 mb-6">
                     {(['Daily', 'Weekly', 'Monthly'] as const).map(period => (
                         <button
                             key={period}
                             onClick={() => setActiveReport(period)}
                             className={cn(
-                                "w-full px-3 py-2 text-sm rounded-md transition-colors font-semibold",
+                                "w-full px-3 py-2 text-sm rounded-md transition-colors font-display font-semibold tracking-wider uppercase",
                                 activeReport === period
-                                    ? "bg-brand-cyan-600 text-brand-blue-900"
+                                    ? "bg-brand-amber-400 text-brand-amber-900"
                                     : "text-gray-300 hover:bg-white/10"
                             )}
                         >
-                            {period === 'Daily' ? 'Daily Report' : period === 'Weekly' ? 'Weekly Summary' : 'Monthly Review'}
+                            {period} Report
                         </button>
                     ))}
                 </div>

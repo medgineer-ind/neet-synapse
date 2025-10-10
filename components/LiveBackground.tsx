@@ -42,7 +42,7 @@ const LiveBackground: React.FC = () => {
 
             draw() {
                 if(!ctx) return;
-                ctx.fillStyle = 'rgba(0, 239, 255, 0.8)';
+                ctx.fillStyle = 'rgba(251, 191, 36, 0.7)';
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
                 ctx.fill();
@@ -55,8 +55,8 @@ const LiveBackground: React.FC = () => {
                 const size = Math.random() * 1.5 + 0.5;
                 const x = Math.random() * canvas.width;
                 const y = Math.random() * canvas.height;
-                const speedX = (Math.random() - 0.5) * 0.5;
-                const speedY = (Math.random() - 0.5) * 0.5;
+                const speedX = (Math.random() - 0.5) * 0.3;
+                const speedY = (Math.random() - 0.5) * 0.3;
                 particles.push(new Particle(x, y, size, speedX, speedY));
             }
         };
@@ -70,10 +70,10 @@ const LiveBackground: React.FC = () => {
                         (particles[a].x - particles[b].x) * (particles[a].x - particles[b].x) +
                         (particles[a].y - particles[b].y) * (particles[a].y - particles[b].y)
                     );
-                    if (distance < 100) {
-                        opacityValue = 1 - (distance / 100);
-                        ctx.strokeStyle = `rgba(0, 239, 255, ${opacityValue * 0.3})`;
-                        ctx.lineWidth = 0.5;
+                    if (distance < 120) {
+                        opacityValue = 1 - (distance / 120);
+                        ctx.strokeStyle = `rgba(251, 191, 36, ${opacityValue * 0.2})`;
+                        ctx.lineWidth = 1;
                         ctx.beginPath();
                         ctx.moveTo(particles[a].x, particles[a].y);
                         ctx.lineTo(particles[b].x, particles[b].y);

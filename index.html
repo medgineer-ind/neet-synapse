@@ -7,7 +7,25 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: rgba(2, 6, 23, 0.5); /* slate-950 with opacity */
+      }
+      ::-webkit-scrollbar-thumb {
+        background-color: rgba(251, 191, 36, 0.4); /* amber-400 with opacity */
+        border-radius: 10px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(251, 191, 36, 0.6); /* amber-400 with more opacity */
+      }
+    </style>
     <script>
       tailwind.config = {
         darkMode: 'class',
@@ -15,36 +33,56 @@
           extend: {
             fontFamily: {
               sans: ['Inter', 'sans-serif'],
+              display: ['Rajdhani', 'sans-serif'],
             },
             colors: {
-              'brand-cyan': {
-                '100': '#E0FFFF',
-                '200': '#B3FDFF',
-                '300': '#80F9FF',
-                '400': '#4DF4FF',
-                '500': '#00EFFF',
-                '600': '#00C3D3',
-                '700': '#0097A7',
-                '800': '#006B7B',
-                '900': '#00404F',
+              'brand-amber': {
+                '300': '#FCD34D',
+                '400': '#FBBF24',
+                '500': '#F59E0B',
+                '600': '#D97706',
+                '700': '#B45309',
+                '900': '#78350F',
               },
-              'brand-blue': {
-                '900': '#0A192F'
+              'brand-orange': {
+                '400': '#FB923C',
+                '700': '#C2410C',
+                '900': '#7C2D12',
+              },
+              slate: {
+                800: '#1E293B',
+                900: '#0F172A',
+                950: '#020617',
               }
             },
             boxShadow: {
-              'glow-cyan': '0 0 15px rgba(0, 239, 255, 0.4)',
-              'glow-cyan-light': '0 0 8px rgba(0, 239, 255, 0.3)',
-              'glow-cyan-intense': '0 0 25px rgba(0, 239, 255, 0.6)',
+              'glow-amber-xs': '0 0 5px rgba(251, 191, 36, 0.4)',
+              'glow-amber': '0 0 15px rgba(251, 191, 36, 0.4)',
+              'glow-amber-lg': '0 0 30px rgba(251, 191, 36, 0.4)',
             },
             keyframes: {
               fadeIn: {
                 '0%': { opacity: '0', transform: 'translateY(10px)' },
                 '100%': { opacity: '1', transform: 'translateY(0)' },
               },
+              slideIn: {
+                 '0%': { opacity: '0', transform: 'translateX(20px)' },
+                 '100%': { opacity: '1', transform: 'translateX(0)' },
+              },
+              pulseGlow: {
+                '0%, 100%': { boxShadow: '0 0 15px rgba(251, 191, 36, 0.5)' },
+                '50%': { boxShadow: '0 0 25px rgba(251, 191, 36, 0.8)' },
+              },
+              pulseGlowEnergetic: {
+                '0%, 100%': { boxShadow: '0 0 15px rgba(251, 191, 36, 0.6), 0 0 5px rgba(251, 191, 36, 0.8)' },
+                '50%': { boxShadow: '0 0 25px rgba(251, 191, 36, 0.9), 0 0 10px rgba(251, 191, 36, 1)' },
+              }
             },
             animation: {
               fadeIn: 'fadeIn 0.5s ease-out forwards',
+              slideIn: 'slideIn 0.5s ease-out forwards',
+              pulseGlow: 'pulseGlow 2.5s infinite ease-in-out',
+              pulseGlowEnergetic: 'pulseGlowEnergetic 3s infinite ease-in-out',
             },
           },
         },
@@ -63,7 +101,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body>
+  <body class="bg-slate-950">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
   <script type="module" src="/index.tsx"></script>

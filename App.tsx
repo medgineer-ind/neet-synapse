@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, NavLink, Link } from 'react-router-dom';
+import { Routes, Route, NavLink, Link, useLocation } from 'react-router-dom';
 import Planner from './components/Planner';
 import Dashboard from './components/Dashboard';
 import Settings from './components/Settings';
@@ -13,7 +13,7 @@ import { Task, ActiveTimer, StudySession, TestPlan, TopicPracticeAttempt } from 
 import LiveBackground from './components/LiveBackground';
 import useLocalStorage from './hooks/useLocalStorage';
 import useStorageUsage from './hooks/useStorageUsage';
-import { generatePerformanceSummary, parseDurationFromInput, formatDuration } from './lib/utils';
+import { generatePerformanceSummary, formatDuration } from './lib/utils';
 import { Button, Modal, Input } from './components/ui/StyledComponents';
 import { TimeEditor } from './components/ui/TimeEditor';
 
@@ -21,10 +21,10 @@ import { TimeEditor } from './components/ui/TimeEditor';
 // --- ADMIN NOTIFICATION CONFIG ---
 // To show a new notification, change the id, update content, and set active to true.
 const adminNotificationConfig = {
-  id: 'update-2024-07-29-v1', // IMPORTANT: Change this ID for every new notification to re-show it.
+  id: 'update-2024-07-30-theme', // IMPORTANT: Change this ID for every new notification to re-show it.
   active: true, // Set to 'false' to hide the notification entirely.
-  title: 'Message from the Developer',
-  message: 'Welcome to NEET Synapse! This app is a work in progress, and your feedback is valuable. Please share your thoughts on my social channels linked in the Settings page.',
+  title: 'New "Solaris" Theme!',
+  message: 'The app has been updated with a warmer, eye-friendly color palette to reduce blue light strain during long study sessions. Enjoy the new look!',
   link: undefined,
   linkText: undefined,
 };
@@ -44,7 +44,6 @@ const AdminNotification: React.FC = () => {
                 }
             } catch (error) {
                 console.error("Could not access localStorage:", error);
-                // If localStorage is unavailable, just show the notification
                 setIsVisible(true);
             }
         }
@@ -64,17 +63,17 @@ const AdminNotification: React.FC = () => {
     }
 
     return (
-        <div className="sticky top-16 z-40 bg-slate-900/70 backdrop-blur-xl border-b border-brand-cyan-500/20 animate-fadeIn" role="alert">
+        <div className="sticky top-16 z-40 bg-slate-900/70 backdrop-blur-xl border-b border-brand-amber-500/20 animate-fadeIn" role="alert">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between gap-4 py-3">
                     <div className="flex items-center gap-3">
-                        <MegaphoneIcon className="w-6 h-6 text-brand-cyan-400 flex-shrink-0" />
+                        <MegaphoneIcon className="w-6 h-6 text-brand-amber-400 flex-shrink-0" />
                         <div className="text-sm">
-                            <p className="font-bold text-brand-cyan-400">{title}</p>
+                            <p className="font-display font-bold text-brand-amber-400">{title}</p>
                             <p className="text-gray-300">
                                 {message}{' '}
                                 {link && linkText && (
-                                    <a href={link} target="_blank" rel="noopener noreferrer" className="underline hover:text-brand-cyan-300 font-semibold">
+                                    <a href={link} target="_blank" rel="noopener noreferrer" className="underline hover:text-brand-amber-300 font-semibold">
                                         {linkText}
                                     </a>
                                 )}
@@ -138,7 +137,7 @@ const StorageWarningBanner: React.FC<{ usagePercentage: number }> = ({ usagePerc
                     <div className="flex items-center gap-3">
                         <AlertTriangleIcon className={`w-6 h-6 ${iconColor} flex-shrink-0`} />
                         <div className="text-sm">
-                            <p className={`font-bold ${iconColor}`}>{title} ({usagePercentage.toFixed(1)}% full)</p>
+                            <p className={`font-display font-bold ${iconColor}`}>{title} ({usagePercentage.toFixed(1)}% full)</p>
                             <p className="text-gray-300">
                                 {message}{' '}
                                 <Link to="/settings" className="underline hover:text-white font-semibold">
@@ -197,18 +196,18 @@ const TimerBar: React.FC<{
     const timerName = activeTimer.task?.name || activeTimer.test?.name || "Timer";
 
     return (
-        <div className="fixed bottom-20 md:bottom-5 right-5 z-[60] bg-slate-900/70 backdrop-blur-xl border border-brand-cyan-500/20 rounded-lg shadow-glow-cyan-intense flex items-center justify-between gap-4 p-3 animate-fadeIn">
+        <div className="fixed bottom-20 md:bottom-5 right-5 z-[60] bg-slate-900/80 backdrop-blur-xl border border-brand-amber-500/30 rounded-lg shadow-glow-amber flex items-center justify-between gap-4 p-3 animate-fadeIn w-64">
             <div className="flex-1 min-w-0">
-                <p className="font-bold text-brand-cyan-400 text-lg">{displayTime}</p>
+                <p className="font-display font-bold text-brand-amber-400 text-2xl tracking-wider">{displayTime}</p>
                 <p className="text-xs text-gray-300 truncate" title={timerName}>{timerName}</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col items-center gap-1.5">
                 {activeTimer.isPaused ? (
-                    <Button onClick={resumeTimer} size="sm" variant="secondary" aria-label="Resume Timer"><PlayIcon className="w-4 h-4" /></Button>
+                    <Button onClick={resumeTimer} size="sm" variant="secondary" aria-label="Resume Timer" className="p-2"><PlayIcon className="w-4 h-4" /></Button>
                 ) : (
-                    <Button onClick={pauseTimer} size="sm" variant="secondary" aria-label="Pause Timer"><PauseIcon className="w-4 h-4" /></Button>
+                    <Button onClick={pauseTimer} size="sm" variant="secondary" aria-label="Pause Timer" className="p-2"><PauseIcon className="w-4 h-4" /></Button>
                 )}
-                <Button onClick={stopTimer} size="sm" variant="danger" aria-label="Stop Timer"><StopCircleIcon className="w-4 h-4" /></Button>
+                <Button onClick={stopTimer} size="sm" variant="danger" aria-label="Stop Timer" className="p-2"><StopCircleIcon className="w-4 h-4" /></Button>
             </div>
         </div>
     );
@@ -216,79 +215,38 @@ const TimerBar: React.FC<{
 
 
 const Header: React.FC = () => {
-    const activeLinkStyle = {
-        background: 'rgba(0, 239, 255, 0.1)',
-        boxShadow: '0 0 15px rgba(0, 239, 255, 0.4)',
-        color: '#00EFFF',
-        borderBottom: '2px solid #00EFFF'
-    };
-
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 bg-slate-900/50 backdrop-blur-xl border-b border-brand-cyan-500/20">
+        <header className="fixed top-0 left-0 right-0 z-50 bg-slate-900/60 backdrop-blur-xl border-b border-brand-amber-500/10">
             <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
                     <div className="flex items-center">
-                        <span className="font-bold text-xl text-brand-cyan-500 tracking-wider drop-shadow-[0_0_5px_rgba(0,239,255,0.7)]">
-                            NEET Synapse
-                        </span>
+                         <Link to="/" className="flex items-center gap-2">
+                            <BrainCircuitIcon className="w-8 h-8 text-brand-amber-400" />
+                            <span className="font-display font-bold text-2xl text-brand-amber-400 tracking-wider drop-shadow-[0_0_8px_rgba(251,191,36,0.7)]">
+                                NEET Synapse
+                            </span>
+                        </Link>
                     </div>
-                    <div className="hidden md:flex items-center space-x-4">
-                        <NavLink
-                            to="/"
-                            className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300"
-                            style={({ isActive }) => isActive ? activeLinkStyle : { borderBottom: '2px solid transparent' }}
-                        >
-                           <ClipboardListIcon className="w-5 h-5 mr-2" /> Planner
-                        </NavLink>
-                        <NavLink
-                            to="/test-planner"
-                            className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300"
-                            style={({ isActive }) => isActive ? activeLinkStyle : { borderBottom: '2px solid transparent' }}
-                        >
-                           <FileTextIcon className="w-5 h-5 mr-2" /> Test Planner
-                        </NavLink>
-                         <NavLink
-                            to="/timeline"
-                            className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300"
-                            style={({ isActive }) => isActive ? activeLinkStyle : { borderBottom: '2px solid transparent' }}
-                        >
-                           <CalendarClockIcon className="w-5 h-5 mr-2" /> View Agenda
-                        </NavLink>
-                         <NavLink
-                            to="/mentor"
-                            className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300"
-                            style={({ isActive }) => isActive ? activeLinkStyle : { borderBottom: '2px solid transparent' }}
-                        >
-                           <BrainCircuitIcon className="w-5 h-5 mr-2" /> AI Mentor
-                        </NavLink>
-                         <NavLink
-                            to="/self-tracker"
-                            className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300"
-                            style={({ isActive }) => isActive ? activeLinkStyle : { borderBottom: '2px solid transparent' }}
-                        >
-                           <ActivityIcon className="w-5 h-5 mr-2" /> Self Tracker
-                        </NavLink>
-                         <NavLink
-                            to="/insights"
-                            className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300"
-                            style={({ isActive }) => isActive ? activeLinkStyle : { borderBottom: '2px solid transparent' }}
-                        >
-                           <HistoryIcon className="w-5 h-5 mr-2" /> Insights
-                        </NavLink>
-                        <NavLink
-                            to="/dashboard"
-                            className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300"
-                            style={({ isActive }) => isActive ? activeLinkStyle : { borderBottom: '2px solid transparent' }}
-                        >
-                            <LayoutDashboardIcon className="w-5 h-5 mr-2" /> Dashboard
-                        </NavLink>
-                        <NavLink
-                            to="/settings"
-                            className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300"
-                            style={({ isActive }) => isActive ? activeLinkStyle : { borderBottom: '2px solid transparent' }}
-                        >
-                            <SettingsIcon className="w-5 h-5 mr-2" /> Settings
-                        </NavLink>
+                    <div className="hidden md:flex items-center space-x-1">
+                        {[
+                            { to: "/", icon: ClipboardListIcon, label: "Planner" },
+                            { to: "/test-planner", icon: FileTextIcon, label: "Test Planner" },
+                            { to: "/timeline", icon: CalendarClockIcon, label: "Agenda" },
+                            { to: "/mentor", icon: BrainCircuitIcon, label: "AI Mentor" },
+                            { to: "/self-tracker", icon: ActivityIcon, label: "Tracker" },
+                            { to: "/insights", icon: HistoryIcon, label: "Insights" },
+                            { to: "/dashboard", icon: LayoutDashboardIcon, label: "Dashboard" },
+                            { to: "/settings", icon: SettingsIcon, label: "Settings" },
+                        ].map(item => (
+                            <NavLink
+                                key={item.to}
+                                to={item.to}
+                                className={({ isActive }) => `relative flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-brand-amber-400 transition-all duration-300 group ${isActive ? 'text-brand-amber-400' : ''}`}
+                            >
+                               <item.icon className="w-5 h-5 mr-2" /> {item.label}
+                                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-0.5 bg-brand-amber-400 transition-all duration-300 group-hover:w-full rounded-full group-[.active]:w-full"></span>
+                            </NavLink>
+                        ))}
                     </div>
                 </div>
             </nav>
@@ -297,71 +255,28 @@ const Header: React.FC = () => {
 };
 
 const BottomNavBar: React.FC = () => {
-    const activeLinkStyle = {
-        color: '#00EFFF', // brand-cyan-500
-        background: 'linear-gradient(to top, rgba(0, 239, 255, 0.2), transparent)',
-        borderTop: '2px solid #00EFFF' 
-    };
-
     return (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-900/50 backdrop-blur-xl border-t border-brand-cyan-500/20">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-900/60 backdrop-blur-xl border-t border-brand-amber-500/10">
             <div className="container mx-auto grid grid-cols-8 h-16">
-                 <NavLink
-                    to="/"
-                    className="flex flex-col items-center justify-center w-full text-xs font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300 pt-1"
-                    style={({ isActive }) => isActive ? activeLinkStyle : {}}
-                >
-                   <ClipboardListIcon className="w-6 h-6 mb-1" /> Planner
-                </NavLink>
-                <NavLink
-                    to="/test-planner"
-                    className="flex flex-col items-center justify-center w-full text-xs font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300 pt-1"
-                    style={({ isActive }) => isActive ? activeLinkStyle : {}}
-                >
-                   <FileTextIcon className="w-6 h-6 mb-1" /> Tests
-                </NavLink>
-                <NavLink
-                    to="/timeline"
-                    className="flex flex-col items-center justify-center w-full text-xs font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300 pt-1"
-                    style={({ isActive }) => isActive ? activeLinkStyle : {}}
-                >
-                   <CalendarClockIcon className="w-6 h-6 mb-1" /> Agenda
-                </NavLink>
-                 <NavLink
-                    to="/mentor"
-                    className="flex flex-col items-center justify-center w-full text-xs font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300 pt-1"
-                    style={({ isActive }) => isActive ? activeLinkStyle : {}}
-                >
-                   <BrainCircuitIcon className="w-6 h-6 mb-1" /> Mentor
-                </NavLink>
-                 <NavLink
-                    to="/self-tracker"
-                    className="flex flex-col items-center justify-center w-full text-xs font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300 pt-1"
-                    style={({ isActive }) => isActive ? activeLinkStyle : {}}
-                >
-                   <ActivityIcon className="w-6 h-6 mb-1" /> Tracker
-                </NavLink>
-                 <NavLink
-                    to="/insights"
-                    className="flex flex-col items-center justify-center w-full text-xs font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300 pt-1"
-                    style={({ isActive }) => isActive ? activeLinkStyle : {}}
-                >
-                   <HistoryIcon className="w-6 h-6 mb-1" /> Insights
-                </NavLink>
-                <NavLink
-                    to="/dashboard"
-                    className="flex flex-col items-center justify-center w-full text-xs font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300 pt-1"
-                    style={({ isActive }) => isActive ? activeLinkStyle : {}}
-                >
-                    <LayoutDashboardIcon className="w-6 h-6 mb-1" /> Dashboard
-                </NavLink>
-                <NavLink
-                    to="/settings"
-                    className="flex flex-col items-center justify-center w-full text-xs font-medium text-gray-300 hover:text-brand-cyan-400 transition-all duration-300 pt-1"
-                    style={({ isActive }) => isActive ? activeLinkStyle : {}}
-                >
-                    <SettingsIcon className="w-6 h-6 mb-1" /> Settings
-                </NavLink>
+                {[
+                    { to: "/", icon: ClipboardListIcon, label: "Planner" },
+                    { to: "/test-planner", icon: FileTextIcon, label: "Tests" },
+                    { to: "/timeline", icon: CalendarClockIcon, label: "Agenda" },
+                    { to: "/mentor", icon: BrainCircuitIcon, label: "Mentor" },
+                    { to: "/self-tracker", icon: ActivityIcon, label: "Tracker" },
+                    { to: "/insights", icon: HistoryIcon, label: "Insights" },
+                    { to: "/dashboard", icon: LayoutDashboardIcon, label: "Dashboard" },
+                    { to: "/settings", icon: SettingsIcon, label: "Settings" },
+                ].map(item => (
+                    <NavLink
+                        key={item.to}
+                        to={item.to}
+                        className={({ isActive }) => `relative flex flex-col items-center justify-center w-full text-xs font-medium text-gray-400 hover:text-brand-amber-400 transition-all duration-300 pt-1 group ${isActive ? 'text-brand-amber-400' : ''}`}
+                    >
+                        <item.icon className="w-6 h-6 mb-1 transition-transform group-hover:scale-110" /> {item.label}
+                        {({ isActive }) => isActive && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-brand-amber-400 rounded-full shadow-glow-amber-xs"></div>}
+                    </NavLink>
+                ))}
             </div>
         </nav>
     );
@@ -423,12 +338,12 @@ const CompleteStudyModal: React.FC<{
     return (
         <Modal isOpen={!!task} onClose={onClose} title={`Complete: ${task?.name}`}>
             <form onSubmit={handleSubmit}>
-                <label className="block mb-2">How difficult was this topic? (1: Easy - 5: Hard)</label>
+                <label className="block mb-2 font-display text-lg">How difficult was this topic?</label>
                 <div className="flex items-center gap-4 my-4">
-                    <span>1</span>
-                    <input type="range" min="1" max="5" value={difficulty} onChange={e => setDifficulty(Number(e.target.value))} className="w-full" />
-                    <span>5</span>
-                    <span className="font-bold text-brand-cyan-400 w-4">{difficulty}</span>
+                    <span className="text-sm text-gray-400">Easy</span>
+                    <input type="range" min="1" max="5" value={difficulty} onChange={e => setDifficulty(Number(e.target.value))} className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer range-lg accent-brand-amber-500" />
+                    <span className="text-sm text-gray-400">Hard</span>
+                    <span className="font-bold text-brand-amber-400 text-2xl w-8 text-center">{difficulty}</span>
                 </div>
                 <TimeEditor initialDuration={initialDuration} onDurationChange={setDuration} />
                 <div className="flex justify-end gap-2 mt-6">
@@ -476,15 +391,15 @@ const CompletePracticeModal: React.FC<{
             <form onSubmit={handleSubmit}>
                 <div className="space-y-4">
                     <div>
-                        <label className="block mb-1">Total Questions Attempted</label>
+                        <label className="block mb-1 font-display">Total Questions Attempted</label>
                         <Input type="number" value={total} onChange={e => setTotal(e.target.value)} min="1" required />
                     </div>
                     <div>
-                        <label className="block mb-1">Number of Correct Answers</label>
+                        <label className="block mb-1 font-display">Number of Correct Answers</label>
                         <Input type="number" value={correct} onChange={e => setCorrect(e.target.value)} min="0" max={total || undefined} required />
                     </div>
                     <div>
-                        <label className="block mb-1">Number of Incorrect Answers</label>
+                        <label className="block mb-1 font-display">Number of Incorrect Answers</label>
                         <Input type="number" value={incorrect} onChange={e => setIncorrect(e.target.value)} min="0" max={total && correct ? String(Number(total) - Number(correct)) : undefined} />
                     </div>
                 </div>
@@ -508,6 +423,7 @@ const App: React.FC = () => {
     const [completedTestInfo, setCompletedTestInfo] = useState<{ test: TestPlan, duration: number } | null>(null);
     const [targetScore, setTargetScore] = useLocalStorage<number>('targetScore', 680);
     const { usagePercentage, refreshUsage } = useStorageUsage();
+    const location = useLocation();
 
     useEffect(() => {
         refreshUsage();
@@ -521,15 +437,14 @@ const App: React.FC = () => {
                 const migratedTasks = currentTasks.map(t => {
                     let task: Task = { ...t };
                     
-                    // Migration 1: microtopic string to microtopics array
-                    const oldTask = task as any;
+                    // Fix: Cast task to 'any' to check for legacy 'microtopic' property for data migration.
+                    const oldTask = t as any;
                     if (oldTask.microtopic && !t.microtopics) {
                         needsUpdate = true;
                         const { microtopic, ...rest } = oldTask;
                         task = { ...rest, microtopics: [microtopic], sessions: t.sessions || [] };
                     }
                     
-                    // Migration 2: duration number to sessions array
                     const taskWithDuration = t as Task & { duration?: number };
                     if (taskWithDuration.duration !== undefined && !t.sessions) {
                         needsUpdate = true;
@@ -555,9 +470,8 @@ const App: React.FC = () => {
         };
         runMigrations();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Only run once on mount
+    }, []); 
     
-    // Effect to trigger modal after timer stops for a test-prep task
     useEffect(() => {
         if (taskToFinalize) {
             setTaskToComplete(taskToFinalize.task);
@@ -606,7 +520,6 @@ const App: React.FC = () => {
             const isTestPrepTask = activeTimer.task.notes?.includes('For upcoming test:');
 
             if (isTestPrepTask) {
-                // For test prep tasks, we always open the finalization modal, even if duration is 0
                 setTaskToFinalize({ task: activeTimer.task, duration: durationInSeconds });
             } else {
                 if (durationInSeconds > 0) {
@@ -648,7 +561,6 @@ const App: React.FC = () => {
             };
             setTasks(prev => [...prev, finalTask].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
 
-            // Update the TestPlan's topicStatus
             const testNameMatch = taskToFinalize.task.notes.match(/For upcoming test: "([^"]+)"/);
             if (testNameMatch) {
                 const testName = testNameMatch[1];
@@ -695,7 +607,6 @@ const App: React.FC = () => {
             };
             setTasks(prev => [...prev, finalTask].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
 
-            // Update the TestPlan's topicStatus
             const testNameMatch = taskToFinalize.task.notes.match(/For upcoming test: "([^"]+)"/);
             if (testNameMatch) {
                 const testName = testNameMatch[1];
@@ -748,9 +659,9 @@ const App: React.FC = () => {
     }
 
     return (
-        <div className="relative min-h-screen text-gray-200 font-sans transition-colors duration-500">
+        <div className="relative min-h-screen text-gray-200 font-sans bg-slate-950">
             <LiveBackground />
-            <div className="absolute inset-0 -z-10 bg-brand-blue-900/95"></div>
+            <div className="absolute inset-0 -z-10 bg-gradient-to-br from-slate-950/95 via-slate-900/95 to-slate-950/95"></div>
             <Header />
             <AdminNotification />
             <StorageWarningBanner usagePercentage={usagePercentage} />

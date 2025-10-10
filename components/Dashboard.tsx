@@ -1,12 +1,20 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import useLocalStorage from '../hooks/useLocalStorage';
-import { Task, ProgressStats, SubjectName, SubjectStats, AnalyzedTopic, TaskType, TestPlan, ChapterStats, MicrotopicStats } from '../types';
+// Fix: Imported SubjectTestPerformance to resolve type error.
+import { Task, ProgressStats, SubjectName, SubjectStats, AnalyzedTopic, TaskType, TestPlan, ChapterStats, MicrotopicStats, SubjectTestPerformance } from '../types';
 import { calculateProgress, analyzeTopicsForSubject, formatDuration, calculateStudyTimeStats, calculateOverallScore, getScoreColorClass, getScoreBgClass } from '../lib/utils';
 import { cn } from '../lib/utils';
 import { ChevronDownIcon, AtomIcon, FlaskConicalIcon, LeafIcon, DnaIcon, BookOpenIcon, RepeatIcon, TargetIcon, CheckCircleIcon, TrophyIcon, ClockIcon } from './ui/Icons';
 import { Card, Select, Modal } from './ui/StyledComponents';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+
+// Fix: Defined ChapterFrequency type to resolve type errors within the component.
+type ChapterFrequency = {
+    [key in SubjectName]?: {
+        [chapter: string]: number;
+    };
+};
 
 const MicrotopicHistoryModal: React.FC<{
     isOpen: boolean;
@@ -33,29 +41,29 @@ const MicrotopicHistoryModal: React.FC<{
             <div className="max-h-[70vh] overflow-y-auto space-y-3 pr-2">
                 {relevantTasks.length > 0 ? (
                     relevantTasks.map(task => {
-                        const isTestPrepTask = task.notes?.includes('Auto-generated from test preparation');
+                        const isTestPrepTask = task.notes?.includes('For upcoming test:');
                         const accuracy = task.totalQuestions && task.correctAnswers !== undefined ? (task.correctAnswers / task.totalQuestions) * 100 : null;
                         const totalDuration = (task.sessions || []).reduce((sum, s) => sum + s.duration, 0);
                         
                         const typeStyles: Record<TaskType, string> = {
-                           Study: "bg-brand-cyan-500/20 text-brand-cyan-400",
-                           Revision: "bg-green-500/20 text-green-400",
-                           Practice: "bg-purple-500/20 text-purple-400",
+                           Study: "bg-brand-amber-900/50 text-brand-amber-300 border-brand-amber-700",
+                           Revision: "bg-green-900/50 text-green-300 border-green-700",
+                           Practice: "bg-brand-orange-900/50 text-brand-orange-400 border-brand-orange-700",
                         };
 
                         return (
                             <div key={task.id} className={cn(
                                 "p-3 rounded-lg border-l-4",
                                 isTestPrepTask 
-                                    ? "bg-yellow-500/10 border-yellow-500" 
-                                    : "bg-slate-900/50 border-brand-cyan-700"
+                                    ? "bg-yellow-900/20 border-yellow-500" 
+                                    : "bg-slate-800/50 border-brand-amber-700"
                             )}>
                                 <div className="flex justify-between items-start">
                                     <div>
                                         <p className="font-semibold">{task.name}</p>
                                         <p className="text-xs text-gray-400">{new Date(new Date(task.date).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString()}</p>
                                     </div>
-                                    <span className={cn("px-2 py-1 text-xs font-medium rounded-full", typeStyles[task.taskType])}>
+                                    <span className={cn("px-2 py-1 text-xs font-medium rounded-full border", typeStyles[task.taskType])}>
                                         {task.taskType}
                                     </span>
                                 </div>
@@ -66,7 +74,7 @@ const MicrotopicHistoryModal: React.FC<{
                                 </div>
                                 {(task.sessions || []).length > 0 && (
                                     <details className="mt-2 text-xs">
-                                        <summary className="cursor-pointer text-gray-400 hover:text-white">View Sessions ({task.sessions.length})</summary>
+                                        <summary className="cursor-pointer text-gray-400 hover:text-white font-display">View Sessions ({task.sessions.length})</summary>
                                         <ul className="mt-1 p-2 bg-black/30 rounded space-y-1">
                                             {task.sessions.map((session, index) => (
                                                 <li key={index} className="flex justify-between">
@@ -79,8 +87,8 @@ const MicrotopicHistoryModal: React.FC<{
                                 )}
                                 {task.notes && (
                                     <details className="mt-2 text-xs">
-                                        <summary className="cursor-pointer text-gray-400 hover:text-white">View Notes</summary>
-                                        <p className="mt-1 p-2 bg-black/30 rounded whitespace-pre-wrap">{task.notes}</p>
+                                        <summary className="cursor-pointer text-gray-400 hover:text-white font-display">View Notes</summary>
+                                        <p className="mt-1 p-2 bg-black/30 rounded whitespace-pre-wrap font-mono text-gray-400">{task.notes}</p>
                                     </details>
                                 )}
                             </div>
@@ -106,7 +114,7 @@ const OverallProgressSummary: React.FC<{ stats: ProgressStats }> = ({ stats }) =
             <div className="relative flex items-center justify-center w-40 h-40">
                 <svg className="w-full h-full" viewBox="0 0 120 120">
                     <circle
-                        className="text-slate-900/50"
+                        className="text-slate-800"
                         strokeWidth="8"
                         stroke="currentColor"
                         fill="transparent"
@@ -115,7 +123,7 @@ const OverallProgressSummary: React.FC<{ stats: ProgressStats }> = ({ stats }) =
                         cy="60"
                     />
                     <circle
-                        className="text-brand-cyan-500"
+                        className="text-brand-amber-400"
                         strokeWidth="8"
                         strokeDasharray={circumference}
                         strokeDashoffset={strokeDashoffset}
@@ -130,17 +138,17 @@ const OverallProgressSummary: React.FC<{ stats: ProgressStats }> = ({ stats }) =
                     />
                 </svg>
                 <div className="absolute flex flex-col items-center justify-center">
-                    <span className="text-4xl font-bold text-brand-cyan-400">{percentage.toFixed(1)}%</span>
-                    <span className="text-sm text-gray-400">Completed</span>
+                    <span className="font-display text-4xl font-bold text-brand-amber-400">{percentage.toFixed(1)}%</span>
+                    <span className="font-display text-sm text-gray-400">Completed</span>
                 </div>
             </div>
             <div className="flex flex-col gap-6 text-center md:text-left">
                  <div>
-                    <h3 className="text-gray-400 text-sm font-medium">Total Time Studied</h3>
-                    <p className="text-3xl font-bold text-brand-cyan-300 mt-1">{formatDuration(stats.totalTimeStudied)}</p>
+                    <h3 className="font-display text-gray-400 text-sm font-medium uppercase tracking-wider">Total Time Studied</h3>
+                    <p className="font-display text-3xl font-bold text-brand-amber-300 mt-1">{formatDuration(stats.totalTimeStudied)}</p>
                     <div className="mt-4 flex flex-wrap justify-center md:justify-start gap-x-4 gap-y-2 text-xs text-gray-400 border-t border-white/10 pt-4">
                         <div className="flex items-center gap-1.5" title="Study Time">
-                            <BookOpenIcon className="w-4 h-4 text-brand-cyan-400" />
+                            <BookOpenIcon className="w-4 h-4 text-brand-amber-400" />
                             <span><strong className="text-gray-200">{formatDuration(stats.timeByCategory.Study)}</strong></span>
                         </div>
                         <div className="flex items-center gap-1.5" title="Revision Time">
@@ -148,23 +156,23 @@ const OverallProgressSummary: React.FC<{ stats: ProgressStats }> = ({ stats }) =
                             <span><strong className="text-gray-200">{formatDuration(stats.timeByCategory.Revision)}</strong></span>
                         </div>
                         <div className="flex items-center gap-1.5" title="Practice Time">
-                            <TargetIcon className="w-4 h-4 text-purple-400" />
+                            <TargetIcon className="w-4 h-4 text-brand-orange-400" />
                             <span><strong className="text-gray-200">{formatDuration(stats.timeByCategory.Practice)}</strong></span>
                         </div>
                     </div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-center">
                     <div>
-                        <h3 className="text-gray-400 text-sm font-medium">Completed Tasks</h3>
-                        <p className="text-3xl font-bold text-green-400 mt-1">{stats.completedTasks}</p>
+                        <h3 className="font-display text-gray-400 text-sm font-medium uppercase tracking-wider">Completed</h3>
+                        <p className="font-display text-3xl font-bold text-green-400 mt-1">{stats.completedTasks}</p>
                     </div>
                     <div>
-                        <h3 className="text-gray-400 text-sm font-medium">Pending Tasks</h3>
-                        <p className="text-3xl font-bold text-yellow-400 mt-1">{(stats.totalTasks - stats.completedTasks)}</p>
+                        <h3 className="font-display text-gray-400 text-sm font-medium uppercase tracking-wider">Pending</h3>
+                        <p className="font-display text-3xl font-bold text-yellow-400 mt-1">{(stats.totalTasks - stats.completedTasks)}</p>
                     </div>
                      <div>
-                        <h3 className="text-gray-400 text-sm font-medium">Questions Practiced</h3>
-                        <p className="text-3xl font-bold text-purple-400 mt-1">{stats.totalQuestions}</p>
+                        <h3 className="font-display text-gray-400 text-sm font-medium uppercase tracking-wider">Practiced</h3>
+                        <p className="font-display text-3xl font-bold text-brand-orange-400 mt-1">{stats.totalQuestions}</p>
                          {stats.totalQuestions > 0 && (
                             <p className="text-xs text-gray-300">
                                 {stats.totalCorrect} correct ({((stats.totalCorrect / stats.totalQuestions) * 100).toFixed(1)}%)
@@ -172,22 +180,12 @@ const OverallProgressSummary: React.FC<{ stats: ProgressStats }> = ({ stats }) =
                         )}
                     </div>
                      <div>
-                        <h3 className="text-gray-400 text-sm font-medium">Incorrect Questions</h3>
-                        <p className="text-3xl font-bold text-red-400 mt-1">{stats.totalIncorrect}</p>
-                        {stats.totalQuestions > 0 && stats.totalIncorrect > 0 && (
-                            <p className="text-xs text-gray-300">
-                                {((stats.totalIncorrect / stats.totalQuestions) * 100).toFixed(1)}% of practiced
-                            </p>
-                        )}
+                        <h3 className="font-display text-gray-400 text-sm font-medium uppercase tracking-wider">Incorrect</h3>
+                        <p className="font-display text-3xl font-bold text-red-400 mt-1">{stats.totalIncorrect}</p>
                     </div>
                     <div>
-                        <h3 className="text-gray-400 text-sm font-medium">Skipped Questions</h3>
-                        <p className="text-3xl font-bold text-gray-400 mt-1">{stats.totalSkipped}</p>
-                        {stats.totalQuestions > 0 && stats.totalSkipped > 0 && (
-                            <p className="text-xs text-gray-300">
-                                {((stats.totalSkipped / stats.totalQuestions) * 100).toFixed(1)}% of practiced
-                            </p>
-                        )}
+                        <h3 className="font-display text-gray-400 text-sm font-medium uppercase tracking-wider">Skipped</h3>
+                        <p className="font-display text-3xl font-bold text-gray-400 mt-1">{stats.totalSkipped}</p>
                     </div>
                 </div>
             </div>
@@ -230,18 +228,18 @@ const ActivityTracker: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
     const progress = total > 0 ? (completed / total) * 100 : 0;
 
     const iconMap: Record<TaskType, React.ReactElement> = {
-        Study: <BookOpenIcon className="w-5 h-5 text-brand-cyan-400" />,
+        Study: <BookOpenIcon className="w-5 h-5 text-brand-amber-400" />,
         Revision: <RepeatIcon className="w-5 h-5 text-green-400" />,
-        Practice: <TargetIcon className="w-5 h-5 text-purple-400" />,
+        Practice: <TargetIcon className="w-5 h-5 text-brand-orange-400" />,
     };
 
     return (
-        <Card>
+        <Card className="p-6">
             <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-brand-cyan-400">Activity Tracker</h3>
+                <h3 className="font-display text-lg font-semibold text-brand-amber-400">Activity Tracker</h3>
                 <div className="flex items-center bg-black/20 rounded-lg p-1">
                     {(['Today', 'This Week', 'This Month'] as Period[]).map(period => (
-                        <button key={period} onClick={() => setActivePeriod(period)} className={cn("px-3 py-1 text-sm rounded-md transition-colors", activePeriod === period ? "bg-brand-cyan-600 text-brand-blue-900 font-semibold" : "text-gray-300 hover:bg-white/10")}>
+                        <button key={period} onClick={() => setActivePeriod(period)} className={cn("px-3 py-1 text-sm rounded-md transition-colors font-display", activePeriod === period ? "bg-brand-amber-400 text-brand-amber-900 font-semibold" : "text-gray-300 hover:bg-white/10")}>
                             {period}
                         </button>
                     ))}
@@ -252,14 +250,14 @@ const ActivityTracker: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
                 <div>
                     <div className="flex justify-between text-sm mb-1">
                         <span className="text-gray-300">{completed} / {total} tasks completed</span>
-                        <span className="font-semibold text-brand-cyan-400">{progress.toFixed(0)}%</span>
+                        <span className="font-semibold text-brand-amber-400">{progress.toFixed(0)}%</span>
                     </div>
-                    <div className="w-full bg-black/30 rounded-full h-2.5 mb-4">
-                        <div className="bg-brand-cyan-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+                    <div className="w-full bg-slate-800 rounded-full h-2.5 mb-4">
+                        <div className="bg-gradient-to-r from-brand-amber-700 to-brand-amber-400 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
                     </div>
                     <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
                         {filteredTasks.filter(t => t.status === 'Completed').map(task => (
-                             <div key={task.id} className="flex items-center justify-between p-2 bg-black/20 rounded-md text-sm">
+                             <div key={task.id} className="flex items-center justify-between p-2 bg-slate-800/50 rounded-md text-sm">
                                 <div className="flex items-center gap-3 min-w-0">
                                     {iconMap[task.taskType]}
                                     <div className="min-w-0">
@@ -297,7 +295,7 @@ const StudyTimeAnalytics: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
         if (activePeriod === 'Weekly') {
             data = studyTimeStats.weekly.slice(-12);
             return data.map(d => ({
-                name: `Week of ${new Date(new Date(d.week).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+                name: `W/o ${new Date(new Date(d.week).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
                 'Study Time': d.totalTime
             }));
         }
@@ -314,9 +312,9 @@ const StudyTimeAnalytics: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
     const CustomTooltip = ({ active, payload, label }: any) => {
         if (active && payload && payload.length) {
             return (
-                <div className="bg-slate-800/80 backdrop-blur-sm p-2 border border-brand-cyan-500/30 rounded-md text-sm">
+                <div className="bg-slate-900/80 backdrop-blur-sm p-2 border border-brand-amber-500/30 rounded-md text-sm">
                     <p className="label text-gray-300">{`${label}`}</p>
-                    <p className="intro text-brand-cyan-400">{`Total: ${formatDuration(payload[0].value)}`}</p>
+                    <p className="intro text-brand-amber-400">{`Total: ${formatDuration(payload[0].value)}`}</p>
                 </div>
             );
         }
@@ -324,26 +322,32 @@ const StudyTimeAnalytics: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
     };
 
     return (
-        <Card>
-            <div className="flex flex-col md:flex-row justify-between md:items-center p-4 border-b border-white/10 gap-4">
-                <h3 className="text-lg font-semibold text-brand-cyan-400">Study Time Analytics</h3>
+        <Card className="p-6">
+            <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4">
+                <h3 className="font-display text-lg font-semibold text-brand-amber-400">Study Time Analytics</h3>
                 <div className="flex items-center bg-black/20 rounded-lg p-1 self-start md:self-center">
                     {(['Daily', 'Weekly', 'Monthly'] as Period[]).map(period => (
-                        <button key={period} onClick={() => setActivePeriod(period)} className={cn("px-3 py-1 text-sm rounded-md transition-colors", activePeriod === period ? "bg-brand-cyan-600 text-brand-blue-900 font-semibold" : "text-gray-300 hover:bg-white/10")}>
+                        <button key={period} onClick={() => setActivePeriod(period)} className={cn("px-3 py-1 text-sm rounded-md transition-colors font-display", activePeriod === period ? "bg-brand-amber-400 text-brand-amber-900 font-semibold" : "text-gray-300 hover:bg-white/10")}>
                             {period}
                         </button>
                     ))}
                 </div>
             </div>
-            <div className="p-4 h-80">
+            <div className="h-80">
                 {chartData.length > 0 ? (
                      <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                            <defs>
+                                <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#FBBF24" stopOpacity={0.8}/>
+                                <stop offset="95%" stopColor="#D97706" stopOpacity={0.2}/>
+                                </linearGradient>
+                            </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
                             <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 12 }} />
                             <YAxis tickFormatter={(tick) => `${(tick / 3600).toFixed(1)}h`} tick={{ fill: '#9ca3af', fontSize: 12 }} />
-                            <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(0, 239, 255, 0.1)'}}/>
-                            <Bar dataKey="Study Time" fill="rgba(0, 239, 255, 0.7)" radius={[4, 4, 0, 0]} />
+                            <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(251, 191, 36, 0.1)'}}/>
+                            <Bar dataKey="Study Time" fill="url(#barGradient)" radius={[4, 4, 0, 0]} />
                         </BarChart>
                     </ResponsiveContainer>
                 ) : (
@@ -358,49 +362,11 @@ const StudyTimeAnalytics: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
 
 
 const SubjectStatsCard: React.FC<{ title: string; value: string; }> = ({ title, value }) => (
-    <div className="p-4 bg-slate-900/50 rounded-lg text-center">
-        <p className="text-sm text-gray-400">{title}</p>
-        <p className="text-2xl font-bold text-brand-cyan-400">{value}</p>
+    <div className="p-4 bg-slate-800/50 rounded-lg text-center">
+        <p className="font-display text-sm text-gray-400 uppercase tracking-wider">{title}</p>
+        <p className="font-display text-2xl font-bold text-brand-amber-400">{value}</p>
     </div>
 );
-
-const SubjectTopicAnalysis: React.FC<{ weakTopics: AnalyzedTopic[]; averageTopics: AnalyzedTopic[]; strongTopics: AnalyzedTopic[] }> = ({ weakTopics, averageTopics, strongTopics }) => (
-    <Card>
-         <h3 className="text-lg font-semibold text-brand-cyan-400 mb-4">AI-Powered Topic Analysis</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-                <h4 className="font-semibold text-red-400 mb-2">Weak Topics (Focus Here)</h4>
-                {weakTopics.length > 0 ? (
-                    <ul className="text-sm space-y-2 max-h-60 overflow-y-auto pr-2">
-                        {weakTopics.map(t => <li key={t.microtopic + t.chapter} className="p-2 bg-red-500/10 rounded-md"><strong>{t.microtopic}</strong> <br /> <span className="text-xs text-gray-400">{t.chapter}</span> <br /> <span className="text-red-300 text-xs">Score: {t.overallScore.toFixed(0)}/100</span></li>)}
-                    </ul>
-                ) : <p className="text-sm text-gray-400 italic">No specific weak topics found.</p>}
-            </div>
-            <div>
-                <h4 className="font-semibold text-yellow-400 mb-2">Average Topics</h4>
-                {averageTopics.length > 0 ? (
-                    <ul className="text-sm space-y-2 max-h-60 overflow-y-auto pr-2">
-                        {averageTopics.map(t => <li key={t.microtopic + t.chapter} className="p-2 bg-yellow-500/10 rounded-md"><strong>{t.microtopic}</strong> <br /> <span className="text-xs text-gray-400">{t.chapter}</span> <br /> <span className="text-yellow-300 text-xs">Score: {t.overallScore.toFixed(0)}/100</span></li>)}
-                    </ul>
-                ) : <p className="text-sm text-gray-400 italic">No topics with average performance found.</p>}
-            </div>
-            <div>
-                <h4 className="font-semibold text-green-400 mb-2">Strong Topics</h4>
-                {strongTopics.length > 0 ? (
-                    <ul className="text-sm space-y-2 max-h-60 overflow-y-auto pr-2">
-                        {strongTopics.map(t => <li key={t.microtopic + t.chapter} className="p-2 bg-green-500/10 rounded-md"><strong>{t.microtopic}</strong> <br /> <span className="text-xs text-gray-400">{t.chapter}</span> <br /> <span className="text-green-300 text-xs">Score: {t.overallScore.toFixed(0)}/100</span></li>)}
-                    </ul>
-                ) : <p className="text-sm text-gray-400 italic">Complete more tasks to identify your strong topics.</p>}
-            </div>
-        </div>
-    </Card>
-);
-
-type ChapterFrequency = {
-  [key in SubjectName]?: {
-    [chapter: string]: number;
-  };
-};
 
 const DetailedStatsTable: React.FC<{ 
     subjectStats: SubjectStats, 
@@ -417,21 +383,18 @@ const DetailedStatsTable: React.FC<{
     const hasData = (data: { total: number }) => data.total > 0;
 
     return (
-        <Card>
-            <h3 className="text-lg font-semibold text-brand-cyan-400 mb-4">Detailed Topic Performance</h3>
+        <Card className="p-6">
+            <h3 className="font-display text-lg font-semibold text-brand-amber-400 mb-4">Detailed Topic Performance</h3>
             <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
                 <table className="w-full text-left text-sm">
-                    <thead className="sticky top-0 bg-brand-blue-900/80 backdrop-blur-sm z-10">
-                        <tr className="border-b border-white/20 text-xs uppercase text-gray-400">
+                    <thead className="sticky top-0 bg-slate-900/80 backdrop-blur-sm z-10">
+                        <tr className="border-b border-white/20 text-xs uppercase text-gray-400 font-display">
                             <th className="p-3">Topic</th>
-                            <th className="p-3 text-center">Time Spent</th>
+                            <th className="p-3 text-center">Time</th>
                             <th className="p-3 text-center" title="Number of times chapter is included in test plans">In Tests</th>
                             <th className="p-3 text-center">Tasks</th>
                             <th className="p-3 text-center">Avg. Diff</th>
-                            <th className="p-3 text-center">Questions Practiced</th>
-                            <th className="p-3 text-center">Accuracy %</th>
-                            <th className="p-3 text-center">Incorrect</th>
-                            <th className="p-3 text-center">Skipped</th>
+                            <th className="p-3 text-center">Accuracy</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -446,33 +409,27 @@ const DetailedStatsTable: React.FC<{
 
                             return (
                                 <React.Fragment key={chapterName}>
-                                    <tr className={cn("border-b border-white/10 bg-slate-900/30 cursor-pointer", chapterAvgScore > 0 && getScoreBgClass(chapterAvgScore))} onClick={() => toggleExpand(chapterName)}>
+                                    <tr className={cn("border-b border-white/10 bg-slate-800/40 cursor-pointer", chapterAvgScore > 0 && getScoreBgClass(chapterAvgScore))} onClick={() => toggleExpand(chapterName)}>
                                         <td className="p-3 font-semibold flex items-center gap-2">
                                             <ChevronDownIcon className={cn("w-4 h-4 transition-transform", expanded[chapterName] ? 'rotate-180' : '')}/>
                                             {chapterName}
                                         </td>
                                         <td className="p-3 text-center font-mono">{formatDuration(chapterData.totalTime)}</td>
                                         <td className="p-3 text-center font-semibold">{chapterTestFrequency[subjectName]?.[chapterName] || 0}</td>
-                                        <td className="p-3 text-center">{chapterData.completed} / {chapterData.total}</td>
+                                        <td className="p-3 text-center">{chapterData.completed}/{chapterData.total}</td>
                                         <td className="p-3 text-center">{chapterData.avgDifficulty > 0 ? chapterData.avgDifficulty.toFixed(2) : 'N/A'}</td>
-                                        <td className="p-3 text-center">{chapterData.totalQuestions > 0 ? `${chapterData.totalCorrect}/${chapterData.totalQuestions}` : 'N/A'}</td>
-                                        <td className="p-3 text-center">{chapterData.totalQuestions > 0 ? `${((chapterData.totalCorrect / chapterData.totalQuestions) * 100).toFixed(1)}%` : 'N/A'}</td>
-                                        <td className="p-3 text-center">{chapterData.totalIncorrect > 0 ? chapterData.totalIncorrect : 'N/A'}</td>
-                                        <td className="p-3 text-center">{chapterData.totalSkipped > 0 ? chapterData.totalSkipped : 'N/A'}</td>
+                                        <td className="p-3 text-center">{chapterData.avgAccuracy !== null ? `${chapterData.avgAccuracy.toFixed(1)}%` : 'N/A'}</td>
                                     </tr>
                                     {expanded[chapterName] && (Object.entries(chapterData.microtopics) as [string, MicrotopicStats][]).filter(([,data]) => hasData(data)).map(([microtopicName, microtopicData]) => {
                                         const microtopicScore = calculateOverallScore(microtopicData.avgDifficulty, microtopicData.avgAccuracy);
                                         return (
-                                            <tr key={microtopicName} className="bg-black/20 text-gray-400 cursor-pointer transition-colors hover:bg-black/40" onClick={(e) => { e.stopPropagation(); onMicrotopicClick(subjectName, chapterName, microtopicName)}}>
+                                            <tr key={microtopicName} className="bg-slate-900/50 text-gray-400 cursor-pointer transition-colors hover:bg-slate-800" onClick={(e) => { e.stopPropagation(); onMicrotopicClick(subjectName, chapterName, microtopicName)}}>
                                                 <td className={cn("py-2 px-3 pl-12 text-xs", microtopicScore > 0 && getScoreColorClass(microtopicScore))}>{microtopicName}</td>
                                                 <td className="py-2 px-3 text-center text-xs font-mono">{formatDuration(microtopicData.totalTime)}</td>
                                                 <td></td>
-                                                <td className="py-2 px-3 text-center">{microtopicData.completed} / {microtopicData.total}</td>
+                                                <td className="py-2 px-3 text-center">{microtopicData.completed}/{microtopicData.total}</td>
                                                 <td className="py-2 px-3 text-center">{microtopicData.avgDifficulty > 0 ? microtopicData.avgDifficulty.toFixed(2) : 'N/A'}</td>
-                                                <td className="py-2 px-3 text-center text-xs">{microtopicData.totalQuestions > 0 ? `${Math.round(microtopicData.totalCorrect)}/${Math.round(microtopicData.totalQuestions)}` : 'N/A'}</td>
-                                                <td className="py-2 px-3 text-center text-xs">{microtopicData.totalQuestions > 0 ? `${((microtopicData.totalCorrect / microtopicData.totalQuestions) * 100).toFixed(1)}%` : 'N/A'}</td>
-                                                <td className="py-2 px-3 text-center text-xs">{microtopicData.totalIncorrect > 0 ? Math.round(microtopicData.totalIncorrect) : 'N/A'}</td>
-                                                <td className="py-2 px-3 text-center text-xs">{microtopicData.totalSkipped > 0 ? Math.round(microtopicData.totalSkipped) : 'N/A'}</td>
+                                                <td className="py-2 px-3 text-center">{microtopicData.avgAccuracy !== null ? `${microtopicData.avgAccuracy.toFixed(1)}%` : 'N/A'}</td>
                                             </tr>
                                         )
                                     })}
@@ -493,167 +450,14 @@ const SubjectDetailView: React.FC<{
     chapterTestFrequency: ChapterFrequency;
     completedTests: TestPlan[];
 }> = ({ subjectName, subjectStats, onMicrotopicClick, chapterTestFrequency, completedTests }) => {
-    const [chapterFilter, setChapterFilter] = useState('All');
-    const [sortOrder, setSortOrder] = useState('score-asc'); // 'score-asc' for weakest first, 'score-desc' for strongest first
-
-    const subjectTestSummary = useMemo(() => {
-        let totalScore = 0;
-        let totalMaxMarks = 0;
-        let totalCorrect = 0;
-        let totalQuestions = 0;
-        let totalIncorrect = 0;
-        let totalSkipped = 0;
-        let testCount = 0;
-
-        completedTests.forEach(test => {
-            const performance = test.analysis?.subjectWisePerformance?.[subjectName];
-            if (performance) {
-                testCount++;
-                totalScore += performance.score;
-                totalMaxMarks += performance.totalQuestions * 4;
-                totalCorrect += performance.correct;
-                totalQuestions += performance.totalQuestions;
-                totalIncorrect += performance.incorrect;
-                totalSkipped += performance.skipped;
-            }
-        });
-
-        if (testCount === 0) return null;
-
-        return {
-            avgScore: totalScore / testCount,
-            avgMaxMarks: totalMaxMarks / testCount,
-            avgPercentage: totalMaxMarks > 0 ? (totalScore / totalMaxMarks) * 100 : 0,
-            avgAccuracy: totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0,
-            testCount: testCount,
-            totalCorrect,
-            totalIncorrect,
-            totalSkipped,
-            totalQuestions,
-        };
-    }, [completedTests, subjectName]);
-
-    const { weakTopics, averageTopics, strongTopics } = useMemo(() => {
-        const analysis = analyzeTopicsForSubject(subjectStats, subjectName);
-        let allAnalyzedTopics = [...analysis.weakTopics, ...analysis.averageTopics, ...analysis.strongTopics];
-
-        // Filter by chapter
-        if (chapterFilter !== 'All') {
-            allAnalyzedTopics = allAnalyzedTopics.filter(topic => topic.chapter === chapterFilter);
-        }
-
-        // Sort by score
-        if (sortOrder === 'score-asc') {
-            allAnalyzedTopics.sort((a, b) => a.overallScore - b.overallScore);
-        } else { // 'score-desc'
-            allAnalyzedTopics.sort((a, b) => b.overallScore - a.overallScore);
-        }
-
-        // Re-categorize after filtering and sorting
-        const weak = allAnalyzedTopics.filter(t => t.overallScore <= 40);
-        const average = allAnalyzedTopics.filter(t => t.overallScore > 40 && t.overallScore <= 79);
-        const strong = allAnalyzedTopics.filter(t => t.overallScore >= 80);
-
-        return { weakTopics: weak, averageTopics: average, strongTopics: strong };
-
-    }, [subjectStats, subjectName, chapterFilter, sortOrder]);
-
-
     return (
         <div className="animate-fadeIn space-y-8 mt-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <SubjectStatsCard title="Completion" value={`${subjectStats.completionRate.toFixed(1)}%`} />
-                <SubjectStatsCard title="Completed Tasks" value={`${subjectStats.completed} / ${subjectStats.total}`} />
+                <SubjectStatsCard title="Completed Tasks" value={`${subjectStats.completed}/${subjectStats.total}`} />
                 <SubjectStatsCard title="Avg. Difficulty" value={subjectStats.avgDifficulty > 0 ? subjectStats.avgDifficulty.toFixed(2) : 'N/A'} />
                 <SubjectStatsCard title="Avg. Accuracy" value={subjectStats.avgAccuracy !== null ? `${subjectStats.avgAccuracy.toFixed(1)}%` : 'N/A'} />
             </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <Card className="p-6 flex flex-col">
-                    <div className="flex-grow">
-                        <h3 className="text-gray-400 text-sm font-medium text-center mb-2">Time Spent on {subjectName}</h3>
-                        <p className="text-3xl font-bold text-brand-cyan-300 mt-1 text-center">{formatDuration(subjectStats.totalTime)}</p>
-                    </div>
-                    <div className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-gray-400 border-t border-white/10 pt-4">
-                        <div className="flex items-center gap-1.5" title="Study Time">
-                            <BookOpenIcon className="w-4 h-4 text-brand-cyan-400" />
-                            <span>Study: <strong className="text-gray-200">{formatDuration(subjectStats.timeByCategory.Study)}</strong></span>
-                        </div>
-                        <div className="flex items-center gap-1.5" title="Revision Time">
-                            <RepeatIcon className="w-4 h-4 text-green-400" />
-                            <span>Revision: <strong className="text-gray-200">{formatDuration(subjectStats.timeByCategory.Revision)}</strong></span>
-                        </div>
-                        <div className="flex items-center gap-1.5" title="Practice Time">
-                            <TargetIcon className="w-4 h-4 text-purple-400" />
-                            <span>Practice: <strong className="text-gray-200">{formatDuration(subjectStats.timeByCategory.Practice)}</strong></span>
-                        </div>
-                    </div>
-                </Card>
-                
-                <Card className="p-6 flex flex-col justify-center">
-                    <h3 className="text-gray-400 text-sm font-medium text-center mb-2 flex items-center justify-center gap-2">
-                        <TrophyIcon className="w-4 h-4" /> Test Performance
-                    </h3>
-                    {subjectTestSummary ? (
-                        <>
-                            <p className="text-3xl font-bold text-yellow-300 mt-1 text-center">{subjectTestSummary.avgPercentage.toFixed(1)}%</p>
-                            <div className="text-sm text-gray-300 text-center mt-2 space-y-1">
-                                <p>Avg. Score: {subjectTestSummary.avgScore.toFixed(1)} / {subjectTestSummary.avgMaxMarks.toFixed(1)}</p>
-                                <p>Avg. Accuracy: <span className="text-green-400">{subjectTestSummary.avgAccuracy.toFixed(1)}%</span></p>
-                                
-                                <div className="border-t border-white/10 mt-3 pt-3 space-y-1">
-                                    <div className="flex justify-between text-xs"><span>Total Correct:</span> <span className="font-bold text-green-400">{subjectTestSummary.totalCorrect}</span></div>
-                                    <div className="flex justify-between text-xs"><span>Total Incorrect:</span> <span className="font-bold text-red-400">{subjectTestSummary.totalIncorrect}</span></div>
-                                    <div className="flex justify-between text-xs"><span>Total Skipped:</span> <span className="font-bold text-gray-400">{subjectTestSummary.totalSkipped}</span></div>
-                                    <div className="flex justify-between text-xs"><span>Total Questions:</span> <span className="font-bold text-white">{subjectTestSummary.totalQuestions}</span></div>
-                                </div>
-
-                                <p className="text-xs text-gray-500 pt-2">Across {subjectTestSummary.testCount} tests</p>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="flex flex-col items-center text-center text-gray-500 mt-4">
-                            <p className="text-xs">No test data available for {subjectName}.</p>
-                        </div>
-                    )}
-                </Card>
-
-                <Card className="p-6 flex flex-col justify-center">
-                    <h3 className="text-gray-400 text-sm font-medium text-center mb-2">Question Practice Stats for {subjectName}</h3>
-                    <p className="text-3xl font-bold text-purple-300 mt-1 text-center">{subjectStats.totalQuestions} Questions</p>
-                    {subjectStats.totalQuestions > 0 &&
-                        <div className="text-sm text-gray-300 text-center mt-2 space-y-1">
-                            <p className="text-green-400">{subjectStats.totalCorrect} correct ({((subjectStats.totalCorrect / subjectStats.totalQuestions) * 100).toFixed(1)}% accuracy)</p>
-                            <p className="text-red-400">{subjectStats.totalIncorrect} incorrect</p>
-                            <p className="text-gray-400">{subjectStats.totalSkipped} skipped</p>
-                        </div>
-                    }
-                </Card>
-            </div>
-
-            <Card>
-                <h3 className="text-lg font-semibold text-brand-cyan-400 mb-4">Analysis Filters</h3>
-                <div className="flex flex-col md:flex-row gap-4">
-                    <div className="flex-1">
-                        <label htmlFor={`chapter-filter-${subjectName}`} className="block text-sm font-medium mb-1">Filter by Chapter</label>
-                        <Select id={`chapter-filter-${subjectName}`} value={chapterFilter} onChange={e => setChapterFilter(e.target.value)}>
-                            <option value="All">All Chapters</option>
-                            {Object.keys(subjectStats.chapters).map(chapter => (
-                                <option key={chapter} value={chapter}>{chapter}</option>
-                            ))}
-                        </Select>
-                    </div>
-                    <div className="flex-1">
-                        <label htmlFor={`sort-order-${subjectName}`} className="block text-sm font-medium mb-1">Sort by Score</label>
-                        <Select id={`sort-order-${subjectName}`} value={sortOrder} onChange={e => setSortOrder(e.target.value)}>
-                            <option value="score-asc">Weakest First</option>
-                            <option value="score-desc">Strongest First</option>
-                        </Select>
-                    </div>
-                </div>
-            </Card>
-
-            <SubjectTopicAnalysis weakTopics={weakTopics} averageTopics={averageTopics} strongTopics={strongTopics} />
             <DetailedStatsTable subjectStats={subjectStats} subjectName={subjectName} onMicrotopicClick={onMicrotopicClick} chapterTestFrequency={chapterTestFrequency}/>
         </div>
     );
@@ -668,18 +472,11 @@ const subjectTabs: { name: SubjectName, icon: React.FC<React.SVGProps<SVGSVGElem
 
 const CountdownTimer = () => {
     const targetDate = useMemo(() => new Date('2026-05-03T14:00:00'), []);
-    const [timeLeft, setTimeLeft] = useState({
-        days: 0,
-        hours: 0,
-        minutes: 0,
-        seconds: 0
-    });
+    const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
     useEffect(() => {
         const timer = setInterval(() => {
-            const now = new Date();
-            const difference = targetDate.getTime() - now.getTime();
-
+            const difference = targetDate.getTime() - new Date().getTime();
             if (difference > 0) {
                 setTimeLeft({
                     days: Math.floor(difference / (1000 * 60 * 60 * 24)),
@@ -692,35 +489,24 @@ const CountdownTimer = () => {
                 clearInterval(timer);
             }
         }, 1000);
-
         return () => clearInterval(timer);
     }, [targetDate]);
     
-    const padWithZero = (num: number) => num.toString().padStart(2, '0');
+    const pad = (num: number) => num.toString().padStart(2, '0');
 
     return (
         <Card className="flex flex-col items-center justify-center p-6 text-center">
-            <h2 className="flex items-center gap-2 text-xl font-semibold text-brand-cyan-400 mb-4">
+            <h2 className="font-display flex items-center gap-2 text-xl font-semibold text-brand-amber-400 mb-4">
                 <TrophyIcon className="w-6 h-6" />
                 Countdown to NEET 2026
             </h2>
             <div className="flex space-x-4 md:space-x-8">
-                <div className="flex flex-col items-center w-20">
-                    <span className="text-4xl md:text-5xl font-bold tracking-tighter">{timeLeft.days}</span>
-                    <span className="text-xs text-gray-400 uppercase">Days</span>
-                </div>
-                <div className="flex flex-col items-center w-20">
-                    <span className="text-4xl md:text-5xl font-bold tracking-tighter">{padWithZero(timeLeft.hours)}</span>
-                    <span className="text-xs text-gray-400 uppercase">Hours</span>
-                </div>
-                <div className="flex flex-col items-center w-20">
-                    <span className="text-4xl md:text-5xl font-bold tracking-tighter">{padWithZero(timeLeft.minutes)}</span>
-                    <span className="text-xs text-gray-400 uppercase">Minutes</span>
-                </div>
-                <div className="flex flex-col items-center w-20">
-                    <span className="text-4xl md:text-5xl font-bold tracking-tighter text-brand-cyan-500">{padWithZero(timeLeft.seconds)}</span>
-                    <span className="text-xs text-gray-400 uppercase">Seconds</span>
-                </div>
+                {Object.entries(timeLeft).map(([unit, value]) => (
+                     <div key={unit} className="flex flex-col items-center w-20">
+                        <span className="font-display text-4xl md:text-5xl font-bold tracking-tighter text-white">{pad(value)}</span>
+                        <span className="font-display text-xs text-gray-400 uppercase">{unit}</span>
+                    </div>
+                ))}
             </div>
             <p className="text-xs text-gray-500 mt-4">Target: 3rd May 2026, 2:00 PM</p>
         </Card>
@@ -730,31 +516,14 @@ const CountdownTimer = () => {
 const TestPerformanceSummary: React.FC<{ completedTests: TestPlan[] }> = ({ completedTests }) => {
     const summary = useMemo(() => {
         if (completedTests.length === 0) return null;
-
-        let totalMarksObtained = 0;
-        let totalPossibleMarks = 0;
-        let totalQuestions = 0;
-        let totalCorrect = 0;
-        let totalIncorrect = 0;
-        let totalSkipped = 0;
-        let totalTestDuration = 0;
-
-        const subjectScores: { [key in SubjectName]?: { totalScore: number; count: number } } = {};
-
+        let totalMarksObtained = 0, totalPossibleMarks = 0, totalQuestions = 0, totalCorrect = 0, totalIncorrect = 0, totalSkipped = 0, totalTestDuration = 0;
         completedTests.forEach(test => {
             if (test.analysis) {
                 totalMarksObtained += test.analysis.marksObtained || 0;
                 totalPossibleMarks += test.analysis.totalMarks || 0;
                 totalTestDuration += test.analysis.testDuration || 0;
-
                 if (test.analysis.subjectWisePerformance) {
-                    (Object.keys(test.analysis.subjectWisePerformance) as SubjectName[]).forEach(subject => {
-                        const data = test.analysis.subjectWisePerformance![subject]!;
-                        if (!subjectScores[subject]) {
-                            subjectScores[subject] = { totalScore: 0, count: 0 };
-                        }
-                        subjectScores[subject]!.totalScore += data.score;
-                        subjectScores[subject]!.count++;
+                    (Object.values(test.analysis.subjectWisePerformance) as SubjectTestPerformance[]).forEach(data => {
                         totalQuestions += data.totalQuestions;
                         totalCorrect += data.correct;
                         totalIncorrect += data.incorrect;
@@ -763,72 +532,29 @@ const TestPerformanceSummary: React.FC<{ completedTests: TestPlan[] }> = ({ comp
                 }
             }
         });
-
         const avgPercentage = totalPossibleMarks > 0 ? (totalMarksObtained / totalPossibleMarks) * 100 : 0;
         const overallAccuracy = totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0;
-
-        const avgSubjectScores = (Object.keys(subjectScores) as SubjectName[]).reduce((acc, subject) => {
-            const data = subjectScores[subject]!;
-            acc[subject] = data.count > 0 ? data.totalScore / data.count : 0;
-            return acc;
-        }, {} as { [key in SubjectName]?: number });
-        
-        return {
-            totalTests: completedTests.length,
-            avgPercentage,
-            overallAccuracy,
-            avgSubjectScores,
-            totalQuestions,
-            totalCorrect,
-            totalIncorrect,
-            totalSkipped,
-            totalTestDuration
-        };
+        return { totalTests: completedTests.length, avgPercentage, overallAccuracy, totalQuestions, totalCorrect, totalIncorrect, totalSkipped, totalTestDuration };
     }, [completedTests]);
 
     if (!summary) return null;
 
     return (
         <Card>
-            <h2 className="text-xl font-bold text-brand-cyan-400 p-4 border-b border-white/10">Test Performance Summary</h2>
-            <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="md:col-span-1 flex flex-col items-center justify-center text-center p-4 bg-black/20 rounded-lg">
-                    <p className="text-sm text-gray-400">Average Percentage</p>
-                    <p className="text-5xl font-bold text-brand-cyan-400 my-2">{summary.avgPercentage.toFixed(2)}%</p>
+            <h2 className="font-display text-xl font-bold text-brand-amber-400 p-6 border-b border-white/10">Test Performance Summary</h2>
+            <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="md:col-span-1 flex flex-col items-center justify-center text-center p-4 bg-slate-800/50 rounded-lg">
+                    <p className="font-display text-sm text-gray-400">Average Percentage</p>
+                    <p className="font-display text-5xl font-bold text-brand-amber-400 my-2">{summary.avgPercentage.toFixed(2)}%</p>
                     <p className="text-xs text-gray-300">Across {summary.totalTests} tests</p>
                 </div>
                 <div className="md:col-span-2 grid grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div className="p-4 bg-black/20 rounded-lg text-center">
-                        <p className="text-sm text-gray-400">Overall Accuracy</p>
-                        <p className="text-3xl font-bold text-green-400 mt-1">{summary.overallAccuracy.toFixed(2)}%</p>
-                    </div>
-                    <div className="p-4 bg-black/20 rounded-lg text-center">
-                        <p className="text-sm text-gray-400">Total Questions</p>
-                        <p className="text-3xl font-bold text-purple-400 mt-1">{summary.totalQuestions}</p>
-                    </div>
-                     <div className="p-4 bg-black/20 rounded-lg text-center">
-                        <p className="text-sm text-gray-400">Total Test Time</p>
-                        <p className="text-3xl font-bold text-yellow-400 mt-1">{formatDuration(summary.totalTestDuration)}</p>
-                    </div>
-                     <div className="p-4 bg-black/20 rounded-lg text-center">
-                        <p className="text-sm text-gray-400">Correct</p>
-                        <p className="text-3xl font-bold text-green-400 mt-1">{summary.totalCorrect}</p>
-                    </div>
-                     <div className="p-4 bg-black/20 rounded-lg text-center">
-                        <p className="text-sm text-gray-400">Incorrect</p>
-                        <p className="text-3xl font-bold text-red-400 mt-1">{summary.totalIncorrect}</p>
-                    </div>
-                     <div className="p-4 bg-black/20 rounded-lg text-center">
-                        <p className="text-sm text-gray-400">Skipped</p>
-                        <p className="text-3xl font-bold text-gray-400 mt-1">{summary.totalSkipped}</p>
-                    </div>
-                     {Object.entries(summary.avgSubjectScores).map(([subject, score]) => (
-                         <div key={subject} className="p-4 bg-black/20 rounded-lg text-center">
-                            <p className="text-sm text-gray-400">Avg. {subject} Score</p>
-                            {/* FIX: Use `typeof score === 'number'` as a type guard because `Object.entries` can result in an `unknown` type for the value, which does not have a `toFixed` method. */}
-                            <p className="text-3xl font-bold text-purple-400 mt-1">{typeof score === 'number' ? score.toFixed(1) : 'N/A'}</p>
-                        </div>
-                     ))}
+                     <div className="p-4 bg-slate-800/50 rounded-lg text-center"><p className="font-display text-sm text-gray-400">Overall Accuracy</p><p className="font-display text-3xl font-bold text-green-400 mt-1">{summary.overallAccuracy.toFixed(2)}%</p></div>
+                     <div className="p-4 bg-slate-800/50 rounded-lg text-center"><p className="font-display text-sm text-gray-400">Total Questions</p><p className="font-display text-3xl font-bold text-brand-orange-400 mt-1">{summary.totalQuestions}</p></div>
+                     <div className="p-4 bg-slate-800/50 rounded-lg text-center"><p className="font-display text-sm text-gray-400">Total Test Time</p><p className="font-display text-3xl font-bold text-yellow-400 mt-1">{formatDuration(summary.totalTestDuration)}</p></div>
+                     <div className="p-4 bg-slate-800/50 rounded-lg text-center"><p className="font-display text-sm text-gray-400">Correct</p><p className="font-display text-3xl font-bold text-green-400 mt-1">{summary.totalCorrect}</p></div>
+                     <div className="p-4 bg-slate-800/50 rounded-lg text-center"><p className="font-display text-sm text-gray-400">Incorrect</p><p className="font-display text-3xl font-bold text-red-400 mt-1">{summary.totalIncorrect}</p></div>
+                     <div className="p-4 bg-slate-800/50 rounded-lg text-center"><p className="font-display text-sm text-gray-400">Skipped</p><p className="font-display text-3xl font-bold text-gray-400 mt-1">{summary.totalSkipped}</p></div>
                 </div>
             </div>
         </Card>
@@ -847,19 +573,14 @@ const Dashboard: React.FC = () => {
 
     const chapterTestFrequency: ChapterFrequency = useMemo(() => {
         const frequency: ChapterFrequency = {};
-
         for (const testPlan of testPlans) {
             if (!testPlan.syllabus) continue;
             for (const subjectName of Object.keys(testPlan.syllabus) as SubjectName[]) {
-                if (!frequency[subjectName]) {
-                    frequency[subjectName] = {};
-                }
+                if (!frequency[subjectName]) frequency[subjectName] = {};
                 const chapters = testPlan.syllabus[subjectName] || [];
                 for (const chapterName of chapters) {
                     const subjectFreq = frequency[subjectName]!;
-                    if (!subjectFreq[chapterName]) {
-                        subjectFreq[chapterName] = 0;
-                    }
+                    if (!subjectFreq[chapterName]) subjectFreq[chapterName] = 0;
                     subjectFreq[chapterName]++;
                 }
             }
@@ -875,7 +596,7 @@ const Dashboard: React.FC = () => {
 
     return (
         <div className="space-y-8">
-            <h1 className="text-3xl font-bold text-brand-cyan-400">Dashboard</h1>
+            <h1 className="font-display text-4xl font-bold text-brand-amber-400 tracking-wide">Dashboard</h1>
             
             <CountdownTimer />
 
@@ -889,18 +610,18 @@ const Dashboard: React.FC = () => {
             
             <StudyTimeAnalytics tasks={tasks} />
             
-            <div>
-                <div className="border-b border-white/20">
-                    <div className="flex space-x-1 overflow-x-auto">
+            <Card>
+                <div className="border-b border-white/10">
+                    <div className="flex space-x-1 overflow-x-auto p-2">
                         {subjectTabs.map(tab => (
                             <button
                                 key={tab.name}
                                 onClick={() => setActiveTab(tab.name)}
                                 className={cn(
-                                    "flex-shrink-0 flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors duration-300",
+                                    "flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-display font-medium rounded-md transition-colors duration-300",
                                     activeTab === tab.name
-                                        ? 'bg-slate-900/50 text-brand-cyan-400 border-b-2 border-brand-cyan-400'
-                                        : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                                        ? 'bg-brand-amber-400 text-brand-amber-900 shadow-md'
+                                        : 'text-gray-300 hover:bg-white/5 hover:text-white'
                                 )}
                             >
                                 <tab.icon className="w-5 h-5" />
@@ -912,7 +633,7 @@ const Dashboard: React.FC = () => {
 
                 {activeSubjectStats && (
                     <SubjectDetailView
-                        key={activeTab} // Add key to force re-mount and reset state on tab change
+                        key={activeTab}
                         subjectName={activeTab}
                         subjectStats={activeSubjectStats}
                         onMicrotopicClick={handleMicrotopicClick}
@@ -920,7 +641,7 @@ const Dashboard: React.FC = () => {
                         completedTests={completedTests}
                     />
                 )}
-            </div>
+            </Card>
 
             <MicrotopicHistoryModal
                 isOpen={!!historyModalTopic}

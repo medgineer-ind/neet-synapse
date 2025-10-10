@@ -15,13 +15,20 @@ const Calendar: React.FC<{
   const [currentMonth, setCurrentMonth] = useState(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
 
   const taskDates = useMemo(() => {
-    const dates = new Set<string>();
+    const dates = new Map<string, Priority>();
     tasks.forEach(task => {
-        const taskDate = new Date(new Date(task.date).toLocaleString("en-US", { timeZone: "UTC" }));
-        dates.add(taskDate.toDateString());
+        const taskDate = new Date(new Date(task.date).toLocaleString("en-US", { timeZone: "UTC" })).toDateString();
+        const priorityOrder: Record<Priority, number> = { High: 1, Medium: 2, Low: 3 };
+        if (!dates.has(taskDate) || priorityOrder[task.priority] < priorityOrder[dates.get(taskDate)!]) {
+            dates.set(taskDate, task.priority);
+        }
     });
     return dates;
   }, [tasks]);
+
+  useEffect(() => {
+    setCurrentMonth(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
+  }, [selectedDate]);
 
   const changeMonth = (amount: number) => {
     setCurrentMonth(prev => {
@@ -34,32 +41,36 @@ const Calendar: React.FC<{
   const renderCalendarDays = () => {
     const month = currentMonth.getMonth();
     const year = currentMonth.getFullYear();
-    const firstDayOfMonth = new Date(year, month, 1).getDay();
+    const firstDayOfWeek = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     
-    const days = [];
-    for (let i = 0; i < firstDayOfMonth; i++) {
-        days.push(<div key={`empty-${i}`} className="w-full h-10"></div>);
-    }
+    const days = Array.from({ length: firstDayOfWeek }, (_, i) => <div key={`empty-${i}`} className="w-full h-10"></div>);
 
     for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(year, month, day);
-        const isSelected = date.toDateString() === selectedDate.toDateString();
-        const isToday = date.toDateString() === new Date().toDateString();
-        const hasTask = taskDates.has(date.toDateString());
+        const dateString = date.toDateString();
+        const isSelected = dateString === selectedDate.toDateString();
+        const isToday = dateString === new Date().toDateString();
+        const taskPriority = taskDates.get(dateString);
+
+        const priorityDotColor: Record<Priority, string> = {
+            High: "bg-red-500",
+            Medium: "bg-yellow-500",
+            Low: "bg-blue-500",
+        };
 
         days.push(
             <div key={day} className="w-full h-10 flex justify-center items-center">
                 <button
                     onClick={() => onDateChange(date)}
                     className={cn(
-                        "w-9 h-9 rounded-full flex flex-col items-center justify-center transition-colors duration-200",
-                        isSelected ? "bg-brand-cyan-500 text-brand-blue-900 font-bold" :
-                        isToday ? "border-2 border-brand-cyan-700" : "hover:bg-white/10",
+                        "w-9 h-9 rounded-full flex flex-col items-center justify-center transition-all duration-200 relative",
+                        isSelected ? "bg-brand-amber-400 text-brand-amber-900 font-bold ring-2 ring-brand-amber-400 ring-offset-2 ring-offset-slate-800" :
+                        isToday ? "border-2 border-brand-amber-700 text-brand-amber-400" : "hover:bg-slate-700/50",
                     )}
                 >
                     {day}
-                    {hasTask && <div className={cn("w-1 h-1 rounded-full mt-0.5", isSelected ? 'bg-brand-blue-900' : 'bg-brand-cyan-500')}></div>}
+                    {taskPriority && <div className={cn("w-1.5 h-1.5 rounded-full absolute bottom-1.5", priorityDotColor[taskPriority])}></div>}
                 </button>
             </div>
         );
@@ -70,13 +81,13 @@ const Calendar: React.FC<{
   return (
     <Card className="p-4 sticky top-24">
         <div className="flex items-center justify-between mb-4 px-2">
-            <button onClick={() => changeMonth(-1)} className="p-1 rounded-full hover:bg-white/10"><ChevronLeftIcon className="w-5 h-5" /></button>
-            <h3 className="font-semibold text-brand-cyan-400 text-lg">
+            <Button onClick={() => changeMonth(-1)} variant="ghost" size="sm" className="p-2"><ChevronLeftIcon className="w-5 h-5" /></Button>
+            <h3 className="font-display font-semibold text-brand-amber-400 text-xl tracking-wide">
                 {currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
             </h3>
-            <button onClick={() => changeMonth(1)} className="p-1 rounded-full hover:bg-white/10"><ChevronRightIcon className="w-5 h-5" /></button>
+            <Button onClick={() => changeMonth(1)} variant="ghost" size="sm" className="p-2"><ChevronRightIcon className="w-5 h-5" /></Button>
         </div>
-        <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-400 mb-2">
+        <div className="grid grid-cols-7 gap-1 text-center text-xs font-display text-gray-400 mb-2">
             {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => <div key={day}>{day}</div>)}
         </div>
         <div className="grid grid-cols-7 gap-1">
@@ -108,7 +119,6 @@ const TaskForm: React.FC<{
     }, [selectedDate]);
     
     useEffect(() => {
-      // Set default microtopic when chapter changes
       if(chapter && syllabus[subject][chapter]) {
         setMicrotopics([syllabus[subject][chapter][0]]);
       }
@@ -141,7 +151,6 @@ const TaskForm: React.FC<{
     const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const dateString = e.target.value;
         if (dateString) {
-            // "YYYY-MM-DD" from input is parsed as UTC midnight. Adjust to local timezone to avoid off-by-one day issues.
             const utcDate = new Date(dateString);
             const localDate = new Date(utcDate.getUTCFullYear(), utcDate.getUTCMonth(), utcDate.getUTCDate());
             onDateChange(localDate);
@@ -162,31 +171,31 @@ const TaskForm: React.FC<{
 
     return (
         <Card className="p-6 mb-8">
-            <h2 className="text-2xl font-bold text-brand-cyan-400 mb-4">Plan a New Task</h2>
+            <h2 className="font-display text-2xl font-bold text-brand-amber-400 mb-4 tracking-wide">Plan a New Task</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                    <label className="block text-sm font-medium mb-1">Task Name</label>
+                    <label className="block text-sm font-medium mb-1 font-display">Task Name</label>
                     <Input type="text" placeholder="e.g., Solve 50 MCQs on Newton's Laws" value={name} onChange={e => setName(e.target.value)} required />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label className="block text-sm font-medium mb-1">Subject</label>
+                        <label className="block text-sm font-medium mb-1 font-display">Subject</label>
                         <Select value={subject} onChange={handleSubjectChange}>{Object.keys(syllabus).map(s => <option key={s} value={s}>{s}</option>)}</Select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Chapter</label>
+                        <label className="block text-sm font-medium mb-1 font-display">Chapter</label>
                         <Select value={chapter} onChange={handleChapterChange}>{Object.keys(syllabus[subject]).map(c => <option key={c} value={c}>{c}</option>)}</Select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Microtopic(s)</label>
-                        <div className="max-h-32 overflow-y-auto bg-slate-900/50 border border-brand-cyan-500/20 rounded-md p-2 space-y-2">
+                        <label className="block text-sm font-medium mb-1 font-display">Microtopic(s)</label>
+                        <div className="max-h-36 overflow-y-auto bg-slate-900/50 border border-slate-700 rounded-md p-2 space-y-2">
                             {syllabus[subject][chapter]?.map(m => (
                                 <label key={m} className="flex items-center space-x-2 cursor-pointer p-1 rounded hover:bg-white/10">
                                     <input
                                         type="checkbox"
                                         checked={microtopics.includes(m)}
                                         onChange={() => handleMicrotopicCheckboxChange(m)}
-                                        className="form-checkbox h-4 w-4 text-brand-cyan-500 bg-gray-800 border-gray-600 rounded focus:ring-brand-cyan-500 focus:ring-offset-0"
+                                        className="form-checkbox h-4 w-4 text-brand-amber-500 bg-slate-800 border-slate-600 rounded focus:ring-brand-amber-500 focus:ring-offset-0"
                                     />
                                     <span className="text-sm">{m}</span>
                                 </label>
@@ -196,7 +205,7 @@ const TaskForm: React.FC<{
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label className="block text-sm font-medium mb-1">Task Type</label>
+                        <label className="block text-sm font-medium mb-1 font-display">Task Type</label>
                         <Select value={taskType} onChange={e => setTaskType(e.target.value as TaskType)}>
                             <option value="Study">Study</option>
                             <option value="Revision">Revision</option>
@@ -204,7 +213,7 @@ const TaskForm: React.FC<{
                         </Select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Priority</label>
+                        <label className="block text-sm font-medium mb-1 font-display">Priority</label>
                          <Select value={priority} onChange={e => setPriority(e.target.value as Priority)}>
                             <option value="High">High</option>
                             <option value="Medium">Medium</option>
@@ -212,12 +221,12 @@ const TaskForm: React.FC<{
                         </Select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Date</label>
+                        <label className="block text-sm font-medium mb-1 font-display">Date</label>
                         <Input type="date" value={date} onChange={handleDateInputChange} />
                     </div>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium mb-1">Notes (Optional)</label>
+                    <label className="block text-sm font-medium mb-1 font-display">Notes (Optional)</label>
                     <Textarea placeholder="Add any notes for this task..." value={notes} onChange={e => setNotes(e.target.value)} rows={2}/>
                 </div>
                  <div className="flex justify-end">
@@ -232,34 +241,21 @@ const TaskForm: React.FC<{
 
 const TaskTypeTag: React.FC<{ type: TaskType }> = ({ type }) => {
     const typeStyles: Record<TaskType, { icon: React.ReactElement; className: string }> = {
-        Study: { icon: <BookOpenIcon className="w-4 h-4" />, className: "bg-brand-cyan-500/20 text-brand-cyan-400" },
-        Revision: { icon: <RepeatIcon className="w-4 h-4" />, className: "bg-green-500/20 text-green-400" },
-        Practice: { icon: <TargetIcon className="w-4 h-4" />, className: "bg-purple-500/20 text-purple-400" },
+        Study: { icon: <BookOpenIcon className="w-4 h-4" />, className: "bg-brand-amber-900/50 text-brand-amber-300 border-brand-amber-700" },
+        Revision: { icon: <RepeatIcon className="w-4 h-4" />, className: "bg-green-900/50 text-green-300 border-green-700" },
+        Practice: { icon: <TargetIcon className="w-4 h-4" />, className: "bg-brand-orange-900/50 text-brand-orange-400 border-brand-orange-700" },
     };
     const { icon, className } = typeStyles[type];
     return (
-        <span className={cn("flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full", className)}>
+        <span className={cn("flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full border", className)}>
             {icon}
             {type}
         </span>
     );
 };
 
-const PriorityBadge: React.FC<{ priority: Priority }> = ({ priority }) => {
-     const priorityStyles: Record<Priority, string> = {
-        High: "bg-red-500/80 text-white",
-        Medium: "bg-yellow-500/80 text-yellow-900",
-        Low: "bg-blue-500/80 text-white",
-    };
-    return (
-        <span className={cn("px-2 py-0.5 text-xs font-semibold rounded-md", priorityStyles[priority])}>
-            {priority}
-        </span>
-    );
-}
 
 // --- TaskItem Component ---
-
 const TaskItem: React.FC<{ 
     task: Task; 
     onCompleteTask: (task: Task) => void; 
@@ -274,34 +270,39 @@ const TaskItem: React.FC<{
     const isTimerActiveForThisTask = activeTimer?.task?.id === task.id;
     const totalDuration = useMemo(() => (task.sessions || []).reduce((sum, s) => sum + s.duration, 0), [task.sessions]);
     
+    const priorityClasses: Record<Priority, string> = {
+        High: "border-l-red-500",
+        Medium: "border-l-yellow-500",
+        Low: "border-l-blue-500",
+    };
+
     return (
         <div className={cn(
-            "bg-slate-900/30 rounded-lg animate-fadeIn transition-all border border-transparent hover:border-brand-cyan-500/20", 
-            isForTest && "border-l-4 border-yellow-400",
-            isTimerActiveForThisTask && "border-brand-cyan-500 shadow-glow-cyan"
+            "relative bg-slate-900/50 backdrop-blur-md rounded-lg border border-white/10 transition-all duration-300 group overflow-hidden border-l-4", 
+            priorityClasses[task.priority],
+            isTimerActiveForThisTask && "animate-pulseGlow border-brand-amber-400"
         )}>
             <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 flex-wrap mb-1">
                         {isForTest && <span title="This topic is in an upcoming test"><TrophyIcon className="w-5 h-5 text-yellow-400"/></span>}
-                        <PriorityBadge priority={task.priority} />
                         {task.notes && <span title="Has notes"><StickyNoteIcon className="w-4 h-4 text-gray-400" /></span>}
-                        <p className="font-semibold truncate" title={task.name}>{task.name}</p>
+                        <p className="font-semibold text-gray-100 truncate" title={task.name}>{task.name}</p>
                     </div>
                     <div className="flex items-center gap-3 flex-wrap">
                         <TaskTypeTag type={task.taskType} />
                         {totalDuration > 0 && (
-                            <span className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full bg-blue-500/20 text-blue-300" title="Total time logged">
+                            <span className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full bg-blue-900/50 text-blue-300 border border-blue-700" title="Total time logged">
                                 <ClockIcon className="w-4 h-4" />
                                 {formatDuration(totalDuration)}
                             </span>
                         )}
                         <p className="text-xs text-gray-400 truncate" title={task.microtopics.join(', ')}>
-                           {task.microtopics.join(', ')} ({task.subject} &gt {task.chapter})
+                           {task.microtopics.join(', ')} ({task.chapter})
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-1 self-end sm:self-center flex-shrink-0">
+                <div className="flex items-center gap-1 self-end sm:self-center flex-shrink-0 transition-opacity duration-300 lg:opacity-0 lg:group-hover:opacity-100">
                     {task.status === 'Pending' ? (
                         <>
                             <Button onClick={() => onCompleteTask(task)} variant="secondary" size="sm">Complete</Button>
@@ -319,37 +320,38 @@ const TaskItem: React.FC<{
                             )}
                         </>
                     ) : (
-                        <span className="text-xs font-bold text-green-400 px-2 py-1 bg-green-500/20 rounded-full">Completed</span>
+                        <span className="text-sm font-bold text-green-400 px-3 py-1 bg-green-500/10 rounded-full border border-green-500/20">Completed</span>
                     )}
                     {task.status === 'Pending' && (
                         <>
-                            <button onClick={() => onReschedule(task)} className="p-2 text-gray-400 hover:text-brand-cyan-400 transition-colors" aria-label="Reschedule task">
+                            <Button onClick={() => onReschedule(task)} variant="ghost" size="sm" className="p-2" aria-label="Reschedule task">
                                 <CalendarPlusIcon className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => onEditTask(task)} className="p-2 text-gray-400 hover:text-brand-cyan-400 transition-colors" aria-label="Edit task">
+                            </Button>
+                            <Button onClick={() => onEditTask(task)} variant="ghost" size="sm" className="p-2" aria-label="Edit task">
                                 <PencilIcon className="w-4 h-4" />
-                            </button>
+                            </Button>
                         </>
                     )}
-                    <button onClick={() => onDeleteTask(task.id)} className="p-2 text-gray-400 hover:text-red-400 transition-colors" aria-label="Delete task">
+                    <Button onClick={() => onDeleteTask(task.id)} variant="ghost" size="sm" className="p-2 hover:bg-red-500/10 hover:text-red-400" aria-label="Delete task">
                         <Trash2Icon className="w-4 h-4" />
-                    </button>
+                    </Button>
                      {(task.notes || task.originalDate) && (
-                        <button onClick={() => setExpanded(prev => !prev)} className="p-2 text-gray-400 hover:text-brand-cyan-400 transition-colors" aria-label="Show details">
+                        <Button onClick={() => setExpanded(prev => !prev)} variant="ghost" size="sm" className="p-2" aria-label="Show details">
                             <ChevronDownIcon className={cn("w-5 h-5 transition-transform", isExpanded && "rotate-180")} />
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>
             {isExpanded && (task.notes || task.originalDate) && (
                 <div className="px-4 pb-4 border-t border-white/10 text-sm text-gray-300 space-y-2 animate-fadeIn">
-                    {task.originalDate && <p><strong className="text-gray-400">Originally planned for:</strong> {new Date(new Date(task.originalDate).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString()}</p>}
-                    {task.notes && <div><strong className="text-gray-400">Notes:</strong><p className="whitespace-pre-wrap pl-2 mt-1">{task.notes}</p></div>}
+                    {task.originalDate && <p><strong className="text-gray-400 font-display">Originally planned for:</strong> {new Date(new Date(task.originalDate).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString()}</p>}
+                    {task.notes && <div><strong className="text-gray-400 font-display">Notes:</strong><p className="whitespace-pre-wrap pl-2 mt-1 font-mono text-xs">{task.notes}</p></div>}
                 </div>
             )}
         </div>
     );
 };
+
 
 // --- Modal Components ---
 
@@ -418,28 +420,28 @@ const EditTaskModal: React.FC<{ task: Task | null; onUpdate: (task: Task) => voi
         <Modal isOpen={!!task} onClose={onClose} title="Edit Task">
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                    <label className="block text-sm font-medium mb-1">Task Name</label>
+                    <label className="block text-sm font-medium mb-1 font-display">Task Name</label>
                     <Input type="text" name="name" placeholder="e.g., Solve 50 MCQs on Newton's Laws" value={formData.name || ''} onChange={handleChange} required />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label className="block text-sm font-medium mb-1">Subject</label>
+                        <label className="block text-sm font-medium mb-1 font-display">Subject</label>
                         <Select name="subject" value={formData.subject || ''} onChange={handleSubjectChange}>{Object.keys(syllabus).map(s => <option key={s} value={s}>{s}</option>)}</Select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Chapter</label>
+                        <label className="block text-sm font-medium mb-1 font-display">Chapter</label>
                         <Select name="chapter" value={formData.chapter || ''} onChange={handleChapterChange}>{chaptersForSubject.map(c => <option key={c} value={c}>{c}</option>)}</Select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Microtopic(s)</label>
-                        <div className="max-h-32 overflow-y-auto bg-slate-900/50 border border-brand-cyan-500/20 rounded-md p-2 space-y-2">
+                        <label className="block text-sm font-medium mb-1 font-display">Microtopic(s)</label>
+                        <div className="max-h-36 overflow-y-auto bg-slate-900/50 border border-slate-700 rounded-md p-2 space-y-2">
                              {microtopicsForChapter.map(m => (
                                 <label key={m} className="flex items-center space-x-2 cursor-pointer p-1 rounded hover:bg-white/10">
                                     <input
                                         type="checkbox"
                                         checked={formData.microtopics?.includes(m) || false}
                                         onChange={() => handleMicrotopicCheckboxChangeForEdit(m)}
-                                        className="form-checkbox h-4 w-4 text-brand-cyan-500 bg-gray-800 border-gray-600 rounded focus:ring-brand-cyan-500 focus:ring-offset-0"
+                                        className="form-checkbox h-4 w-4 text-brand-amber-500 bg-slate-800 border-slate-600 rounded focus:ring-brand-amber-500 focus:ring-offset-0"
                                     />
                                     <span className="text-sm">{m}</span>
                                 </label>
@@ -449,7 +451,7 @@ const EditTaskModal: React.FC<{ task: Task | null; onUpdate: (task: Task) => voi
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                      <div>
-                        <label className="block text-sm font-medium mb-1">Task Type</label>
+                        <label className="block text-sm font-medium mb-1 font-display">Task Type</label>
                         <Select name="taskType" value={formData.taskType || ''} onChange={handleChange}>
                             <option value="Study">Study</option>
                             <option value="Revision">Revision</option>
@@ -457,7 +459,7 @@ const EditTaskModal: React.FC<{ task: Task | null; onUpdate: (task: Task) => voi
                         </Select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Priority</label>
+                        <label className="block text-sm font-medium mb-1 font-display">Priority</label>
                          <Select name="priority" value={formData.priority || ''} onChange={handleChange}>
                             <option value="High">High</option>
                             <option value="Medium">Medium</option>
@@ -465,12 +467,12 @@ const EditTaskModal: React.FC<{ task: Task | null; onUpdate: (task: Task) => voi
                         </Select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Date</label>
+                        <label className="block text-sm font-medium mb-1 font-display">Date</label>
                         <Input type="date" name="date" value={formData.date || ''} onChange={handleChange} />
                     </div>
                 </div>
                  <div>
-                    <label className="block text-sm font-medium mb-1">Notes (Optional)</label>
+                    <label className="block text-sm font-medium mb-1 font-display">Notes (Optional)</label>
                     <Textarea name="notes" placeholder="Add any notes for this task..." value={formData.notes || ''} onChange={handleChange} rows={2}/>
                 </div>
                  <div className="flex justify-end gap-2 mt-6">
@@ -501,7 +503,7 @@ const RescheduleModal: React.FC<{ task: Task | null; onClose: () => void; onResc
     return (
         <Modal isOpen={!!task} onClose={onClose} title={`Reschedule: ${task?.name}`}>
             <form onSubmit={handleSubmit}>
-                <label className="block text-sm font-medium mb-1">New Date</label>
+                <label className="block text-sm font-medium mb-1 font-display">New Date</label>
                 <Input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} min={new Date().toISOString().split('T')[0]} />
                 <div className="flex justify-end gap-2 mt-6">
                     <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
@@ -546,13 +548,13 @@ const UpcomingTestDeadlines: React.FC<{ testPlans: TestPlan[] }> = ({ testPlans 
 
     return (
         <Card className="p-6 mb-8">
-            <h2 className="text-2xl font-bold text-brand-cyan-400 mb-4">Upcoming Test Deadlines</h2>
+            <h2 className="font-display text-2xl font-bold text-brand-amber-400 mb-4 tracking-wide">Upcoming Test Deadlines</h2>
             <div className="space-y-4">
                 {upcomingTestsWithProgress.map(test => (
-                    <div key={test.id} className="p-4 bg-slate-900/50 rounded-lg">
+                    <div key={test.id} className="p-4 bg-slate-800/50 rounded-lg border border-white/10">
                         <div className="flex justify-between items-center mb-2">
                             <span className="font-semibold">{test.name}</span>
-                            <span className="flex items-center text-sm text-yellow-300 gap-1">
+                            <span className="flex items-center text-sm text-yellow-300 gap-1 font-display">
                                 <ClockIcon className="w-4 h-4" /> {test.daysLeft} days left
                             </span>
                         </div>
@@ -561,8 +563,8 @@ const UpcomingTestDeadlines: React.FC<{ testPlans: TestPlan[] }> = ({ testPlans 
                                 <span>Preparation Progress</span>
                                 <span>{test.progress.toFixed(0)}%</span>
                             </div>
-                            <div className="w-full bg-black/30 rounded-full h-2.5">
-                                <div className="bg-brand-cyan-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${test.progress}%` }}></div>
+                            <div className="w-full bg-slate-900/50 rounded-full h-2.5">
+                                <div className="bg-gradient-to-r from-brand-amber-700 to-brand-amber-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${test.progress}%` }}></div>
                             </div>
                         </div>
                     </div>
@@ -660,19 +662,19 @@ const Planner: React.FC<PlannerProps> = ({ tasks, setTasks, activeTimer, startTi
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 space-y-8">
                 <TaskForm onAddTask={addTask} selectedDate={selectedDate} onDateChange={setSelectedDate} />
 
                 <UpcomingTestDeadlines testPlans={testPlans} />
 
-                <div className="mb-4">
-                    <h2 className="text-2xl font-bold text-brand-cyan-400 mb-4">
-                        Tasks for {selectedDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                <div>
+                    <h2 className="font-display text-2xl font-bold text-brand-amber-400 mb-4 tracking-wide">
+                        Tasks for {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                     </h2>
-                     <Card className="p-4">
+                     <Card className="p-4 mb-4">
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 items-center">
-                            <div className="md:col-span-1 flex items-center gap-2 text-sm font-semibold">
-                                <FilterIcon className="w-5 h-5 text-brand-cyan-400" /> Filters
+                            <div className="md:col-span-1 flex items-center gap-2 text-sm font-semibold font-display">
+                                <FilterIcon className="w-5 h-5 text-brand-amber-400" /> Filters
                             </div>
                             <Select value={filters.subject} onChange={e => setFilters(f => ({ ...f, subject: e.target.value as any}))}>
                                 <option value="All">All Subjects</option>
@@ -697,29 +699,30 @@ const Planner: React.FC<PlannerProps> = ({ tasks, setTasks, activeTimer, startTi
                             </Select>
                         </div>
                     </Card>
-                </div>
 
-                {tasksForSelectedDate.length === 0 ? (
-                    <Card className="p-6 text-center text-gray-400 mt-4">
-                        <p>No tasks match your criteria for this day.</p>
-                    </Card>
-                ) : (
-                    <div className="space-y-2">
-                        {tasksForSelectedDate.map(task => (
-                            <TaskItem 
-                                key={task.id} 
-                                task={task} 
-                                onCompleteTask={onCompleteTask} 
-                                onDeleteTask={handleDeleteTask} 
-                                onEditTask={setTaskToEdit} 
-                                onReschedule={setTaskToReschedule} 
-                                isForTest={isTaskForTest(task)}
-                                startTimer={startTimer}
-                                activeTimer={activeTimer}
-                            />
-                        ))}
-                    </div>
-                )}
+                    {tasksForSelectedDate.length === 0 ? (
+                        <Card className="p-10 text-center text-gray-400 mt-4">
+                            <p className="font-display text-lg">No tasks match your criteria for this day.</p>
+                            <p className="text-sm">Try adjusting the filters or planning a new task!</p>
+                        </Card>
+                    ) : (
+                        <div className="space-y-3">
+                            {tasksForSelectedDate.map(task => (
+                                <TaskItem 
+                                    key={task.id} 
+                                    task={task} 
+                                    onCompleteTask={onCompleteTask} 
+                                    onDeleteTask={handleDeleteTask} 
+                                    onEditTask={setTaskToEdit} 
+                                    onReschedule={setTaskToReschedule} 
+                                    isForTest={isTaskForTest(task)}
+                                    startTimer={startTimer}
+                                    activeTimer={activeTimer}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
             
             <div className="lg:col-span-1">
