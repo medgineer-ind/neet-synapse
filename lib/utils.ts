@@ -122,13 +122,15 @@ const createEmptyStats = () => ({
   totalSkipped: 0,
 });
 
+const emptyTimeByCategory = { Lecture: 0, Revision: 0, Practice: 0, SpacedRevision: 0 };
+
 export function calculateProgress(tasks: Task[]): ProgressStats {
   // Initialize the stats object with the full syllabus structure
   const initialSubjects: { [key in SubjectName]: SubjectStats } = {
-    Physics: { ...createEmptyStats(), chapters: {}, timeByCategory: { Study: 0, Revision: 0, Practice: 0 } },
-    Chemistry: { ...createEmptyStats(), chapters: {}, timeByCategory: { Study: 0, Revision: 0, Practice: 0 } },
-    Botany: { ...createEmptyStats(), chapters: {}, timeByCategory: { Study: 0, Revision: 0, Practice: 0 } },
-    Zoology: { ...createEmptyStats(), chapters: {}, timeByCategory: { Study: 0, Revision: 0, Practice: 0 } },
+    Physics: { ...createEmptyStats(), chapters: {}, timeByCategory: { ...emptyTimeByCategory } },
+    Chemistry: { ...createEmptyStats(), chapters: {}, timeByCategory: { ...emptyTimeByCategory } },
+    Botany: { ...createEmptyStats(), chapters: {}, timeByCategory: { ...emptyTimeByCategory } },
+    Zoology: { ...createEmptyStats(), chapters: {}, timeByCategory: { ...emptyTimeByCategory } },
   };
 
   const stats: ProgressStats = {
@@ -137,11 +139,7 @@ export function calculateProgress(tasks: Task[]): ProgressStats {
     completionRate: 0,
     subjects: initialSubjects,
     totalTimeStudied: 0,
-    timeByCategory: {
-        Study: 0,
-        Revision: 0,
-        Practice: 0,
-    },
+    timeByCategory: { ...emptyTimeByCategory },
     totalQuestions: 0,
     totalCorrect: 0,
     totalIncorrect: 0,

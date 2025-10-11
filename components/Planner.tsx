@@ -3,7 +3,7 @@ import { Task, TaskType, SubjectName, TestPlan, Priority, TaskStatus, ActiveTime
 import useLocalStorage from '../hooks/useLocalStorage';
 import { syllabus } from '../data/syllabus';
 import { cn, formatDuration } from '../lib/utils';
-import { PlusIcon, BookOpenIcon, RepeatIcon, TargetIcon, Trash2Icon, TrophyIcon, ClockIcon, PencilIcon, ChevronLeftIcon, ChevronRightIcon, FilterIcon, CalendarPlusIcon, StickyNoteIcon, ChevronDownIcon, PlayIcon } from './ui/Icons';
+import { PlusIcon, BookOpenIcon, RepeatIcon, TargetIcon, Trash2Icon, TrophyIcon, ClockIcon, PencilIcon, ChevronLeftIcon, ChevronRightIcon, FilterIcon, CalendarPlusIcon, StickyNoteIcon, ChevronDownIcon, PlayIcon, BrainCircuitIcon } from './ui/Icons';
 import { Card, Button, Select, Input, Textarea, Modal } from './ui/StyledComponents';
 
 // --- Calendar Component ---
@@ -109,7 +109,7 @@ const TaskForm: React.FC<{
     const [subject, setSubject] = useState<SubjectName>('Physics');
     const [chapter, setChapter] = useState<string>(Object.keys(syllabus.Physics)[0]);
     const [microtopics, setMicrotopics] = useState<string[]>([syllabus.Physics[Object.keys(syllabus.Physics)[0]][0]]);
-    const [taskType, setTaskType] = useState<TaskType>('Study');
+    const [taskType, setTaskType] = useState<TaskType>('Lecture');
     const [priority, setPriority] = useState<Priority>('Medium');
     const [date, setDate] = useState<string>(selectedDate.toISOString().split('T')[0]);
     const [notes, setNotes] = useState('');
@@ -207,7 +207,7 @@ const TaskForm: React.FC<{
                     <div>
                         <label className="block text-sm font-medium mb-1 font-display">Task Type</label>
                         <Select value={taskType} onChange={e => setTaskType(e.target.value as TaskType)}>
-                            <option value="Study">Study</option>
+                            <option value="Lecture">Lecture</option>
                             <option value="Revision">Revision</option>
                             <option value="Practice">Practice</option>
                         </Select>
@@ -241,15 +241,16 @@ const TaskForm: React.FC<{
 
 const TaskTypeTag: React.FC<{ type: TaskType }> = ({ type }) => {
     const typeStyles: Record<TaskType, { icon: React.ReactElement; className: string }> = {
-        Study: { icon: <BookOpenIcon className="w-4 h-4" />, className: "bg-brand-amber-900/50 text-brand-amber-300 border-brand-amber-700" },
+        Lecture: { icon: <BookOpenIcon className="w-4 h-4" />, className: "bg-brand-amber-900/50 text-brand-amber-300 border-brand-amber-700" },
         Revision: { icon: <RepeatIcon className="w-4 h-4" />, className: "bg-green-900/50 text-green-300 border-green-700" },
         Practice: { icon: <TargetIcon className="w-4 h-4" />, className: "bg-brand-orange-900/50 text-brand-orange-400 border-brand-orange-700" },
+        SpacedRevision: { icon: <BrainCircuitIcon className="w-4 h-4" />, className: "bg-cyan-900/50 text-cyan-300 border-cyan-700" },
     };
     const { icon, className } = typeStyles[type];
     return (
         <span className={cn("flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full border", className)}>
             {icon}
-            {type}
+            {type === 'SpacedRevision' ? 'Spaced Rev.' : type}
         </span>
     );
 };
@@ -261,11 +262,12 @@ const TaskItem: React.FC<{
     onCompleteTask: (task: Task) => void; 
     onDeleteTask: (id: string) => void; 
     onEditTask: (task: Task) => void; 
-    onReschedule: (task: Task) => void; 
+    onReschedule: (task: Task) => void;
+    onStartRevision: (task: Task) => void;
     isForTest: boolean;
     startTimer: (task: Task) => void;
     activeTimer: ActiveTimer | null;
-}> = ({ task, onCompleteTask, onDeleteTask, onEditTask, onReschedule, isForTest, startTimer, activeTimer }) => {
+}> = ({ task, onCompleteTask, onDeleteTask, onEditTask, onReschedule, onStartRevision, isForTest, startTimer, activeTimer }) => {
     const [isExpanded, setExpanded] = useState(false);
     const isTimerActiveForThisTask = activeTimer?.task?.id === task.id;
     const totalDuration = useMemo(() => (task.sessions || []).reduce((sum, s) => sum + s.duration, 0), [task.sessions]);
@@ -305,18 +307,26 @@ const TaskItem: React.FC<{
                 <div className="flex items-center gap-1 self-end sm:self-center flex-shrink-0 transition-opacity duration-300 lg:opacity-0 lg:group-hover:opacity-100">
                     {task.status === 'Pending' ? (
                         <>
-                            <Button onClick={() => onCompleteTask(task)} variant="secondary" size="sm">Complete</Button>
-                            {!isTimerActiveForThisTask && (
-                                <Button 
-                                    onClick={() => startTimer(task)} 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="p-2" 
-                                    aria-label="Start timer"
-                                    disabled={!!activeTimer}
-                                >
-                                    <PlayIcon className="w-4 h-4"/>
+                            {task.taskType === 'SpacedRevision' ? (
+                                <Button onClick={() => onStartRevision(task)} variant="secondary" size="sm" className="bg-cyan-500/10 text-cyan-300 border-cyan-500/20 hover:bg-cyan-500/20">
+                                    <BrainCircuitIcon className="w-4 h-4" /> Start Revision
                                 </Button>
+                            ) : (
+                                <>
+                                    <Button onClick={() => onCompleteTask(task)} variant="secondary" size="sm">Complete</Button>
+                                    {!isTimerActiveForThisTask && (
+                                        <Button 
+                                            onClick={() => startTimer(task)} 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            className="p-2" 
+                                            aria-label="Start timer"
+                                            disabled={!!activeTimer}
+                                        >
+                                            <PlayIcon className="w-4 h-4"/>
+                                        </Button>
+                                    )}
+                                </>
                             )}
                         </>
                     ) : (
@@ -453,7 +463,7 @@ const EditTaskModal: React.FC<{ task: Task | null; onUpdate: (task: Task) => voi
                      <div>
                         <label className="block text-sm font-medium mb-1 font-display">Task Type</label>
                         <Select name="taskType" value={formData.taskType || ''} onChange={handleChange}>
-                            <option value="Study">Study</option>
+                            <option value="Lecture">Lecture</option>
                             <option value="Revision">Revision</option>
                             <option value="Practice">Practice</option>
                         </Select>
@@ -590,9 +600,10 @@ interface PlannerProps {
     activeTimer: ActiveTimer | null;
     startTimer: (task: Task) => void;
     onCompleteTask: (task: Task) => void;
+    onStartRevision: (task: Task) => void;
 }
 
-const Planner: React.FC<PlannerProps> = ({ tasks, setTasks, activeTimer, startTimer, onCompleteTask }) => {
+const Planner: React.FC<PlannerProps> = ({ tasks, setTasks, activeTimer, startTimer, onCompleteTask, onStartRevision }) => {
     const [testPlans] = useLocalStorage<TestPlan[]>('testPlans', []);
     const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
     const [taskToReschedule, setTaskToReschedule] = useState<Task | null>(null);
@@ -682,9 +693,10 @@ const Planner: React.FC<PlannerProps> = ({ tasks, setTasks, activeTimer, startTi
                             </Select>
                             <Select value={filters.type} onChange={e => setFilters(f => ({...f, type: e.target.value as any}))}>
                                 <option value="All">All Types</option>
-                                <option value="Study">Study</option>
+                                <option value="Lecture">Lecture</option>
                                 <option value="Revision">Revision</option>
                                 <option value="Practice">Practice</option>
+                                <option value="SpacedRevision">Spaced Revision</option>
                             </Select>
                              <Select value={filters.priority} onChange={e => setFilters(f => ({...f, priority: e.target.value as any}))}>
                                 <option value="All">All Priorities</option>
@@ -715,6 +727,7 @@ const Planner: React.FC<PlannerProps> = ({ tasks, setTasks, activeTimer, startTi
                                     onDeleteTask={handleDeleteTask} 
                                     onEditTask={setTaskToEdit} 
                                     onReschedule={setTaskToReschedule} 
+                                    onStartRevision={onStartRevision}
                                     isForTest={isTaskForTest(task)}
                                     startTimer={startTimer}
                                     activeTimer={activeTimer}

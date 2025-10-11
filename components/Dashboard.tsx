@@ -4,7 +4,7 @@ import useLocalStorage from '../hooks/useLocalStorage';
 import { Task, ProgressStats, SubjectName, SubjectStats, AnalyzedTopic, TaskType, TestPlan, ChapterStats, MicrotopicStats, SubjectTestPerformance } from '../types';
 import { calculateProgress, analyzeTopicsForSubject, formatDuration, calculateStudyTimeStats, calculateOverallScore, getScoreColorClass, getScoreBgClass } from '../lib/utils';
 import { cn } from '../lib/utils';
-import { ChevronDownIcon, AtomIcon, FlaskConicalIcon, LeafIcon, DnaIcon, BookOpenIcon, RepeatIcon, TargetIcon, CheckCircleIcon, TrophyIcon, ClockIcon } from './ui/Icons';
+import { ChevronDownIcon, AtomIcon, FlaskConicalIcon, LeafIcon, DnaIcon, BookOpenIcon, RepeatIcon, TargetIcon, CheckCircleIcon, TrophyIcon, ClockIcon, BrainCircuitIcon } from './ui/Icons';
 import { Card, Select, Modal } from './ui/StyledComponents';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -45,10 +45,12 @@ const MicrotopicHistoryModal: React.FC<{
                         const accuracy = task.totalQuestions && task.correctAnswers !== undefined ? (task.correctAnswers / task.totalQuestions) * 100 : null;
                         const totalDuration = (task.sessions || []).reduce((sum, s) => sum + s.duration, 0);
                         
+                        // Fix: Replaced legacy 'Study' TaskType with 'Lecture' and added 'SpacedRevision'.
                         const typeStyles: Record<TaskType, string> = {
-                           Study: "bg-brand-amber-900/50 text-brand-amber-300 border-brand-amber-700",
+                           Lecture: "bg-brand-amber-900/50 text-brand-amber-300 border-brand-amber-700",
                            Revision: "bg-green-900/50 text-green-300 border-green-700",
                            Practice: "bg-brand-orange-900/50 text-brand-orange-400 border-brand-orange-700",
+                           SpacedRevision: "bg-cyan-900/50 text-cyan-300 border-cyan-700",
                         };
 
                         return (
@@ -149,7 +151,7 @@ const OverallProgressSummary: React.FC<{ stats: ProgressStats }> = ({ stats }) =
                     <div className="mt-4 flex flex-wrap justify-center md:justify-start gap-x-4 gap-y-2 text-xs text-gray-400 border-t border-white/10 pt-4">
                         <div className="flex items-center gap-1.5" title="Study Time">
                             <BookOpenIcon className="w-4 h-4 text-brand-amber-400" />
-                            <span><strong className="text-gray-200">{formatDuration(stats.timeByCategory.Study)}</strong></span>
+                            <span><strong className="text-gray-200">{formatDuration(stats.timeByCategory.Lecture)}</strong></span>
                         </div>
                         <div className="flex items-center gap-1.5" title="Revision Time">
                             <RepeatIcon className="w-4 h-4 text-green-400" />
@@ -227,10 +229,12 @@ const ActivityTracker: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
     const total = filteredTasks.length;
     const progress = total > 0 ? (completed / total) * 100 : 0;
 
+    // Fix: Replaced legacy 'Study' TaskType with 'Lecture' and added 'SpacedRevision'.
     const iconMap: Record<TaskType, React.ReactElement> = {
-        Study: <BookOpenIcon className="w-5 h-5 text-brand-amber-400" />,
+        Lecture: <BookOpenIcon className="w-5 h-5 text-brand-amber-400" />,
         Revision: <RepeatIcon className="w-5 h-5 text-green-400" />,
         Practice: <TargetIcon className="w-5 h-5 text-brand-orange-400" />,
+        SpacedRevision: <BrainCircuitIcon className="w-5 h-5 text-cyan-400" />,
     };
 
     return (
@@ -503,7 +507,8 @@ const CountdownTimer = () => {
             <div className="flex space-x-4 md:space-x-8">
                 {Object.entries(timeLeft).map(([unit, value]) => (
                      <div key={unit} className="flex flex-col items-center w-20">
-                        <span className="font-display text-4xl md:text-5xl font-bold tracking-tighter text-white">{pad(value)}</span>
+                        {/* Fix: Cast `value` to number to resolve TypeScript error. */}
+                        <span className="font-display text-4xl md:text-5xl font-bold tracking-tighter text-white">{pad(value as number)}</span>
                         <span className="font-display text-xs text-gray-400 uppercase">{unit}</span>
                     </div>
                 ))}
@@ -581,7 +586,8 @@ const Dashboard: React.FC = () => {
                 for (const chapterName of chapters) {
                     const subjectFreq = frequency[subjectName]!;
                     if (!subjectFreq[chapterName]) subjectFreq[chapterName] = 0;
-                    subjectFreq[chapterName]++;
+                    // Fix: Changed `++` to `+= 1` to avoid potential TypeScript type inference issues.
+                    subjectFreq[chapterName] = subjectFreq[chapterName] + 1;
                 }
             }
         }

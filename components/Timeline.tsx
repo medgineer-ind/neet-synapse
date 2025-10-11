@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { Task, TestPlan, TaskType, Priority } from '../types';
 import { cn } from '../lib/utils';
-import { BookOpenIcon, RepeatIcon, TargetIcon, TrophyIcon } from './ui/Icons';
+import { BookOpenIcon, RepeatIcon, TargetIcon, TrophyIcon, BrainCircuitIcon } from './ui/Icons';
 import { Card } from './ui/StyledComponents';
 
 type AgendaItem = {
@@ -14,15 +14,16 @@ type AgendaItem = {
 
 const TaskTypeTag: React.FC<{ type: TaskType }> = ({ type }) => {
     const typeStyles: Record<TaskType, { icon: React.ReactElement; className: string }> = {
-        Study: { icon: <BookOpenIcon className="w-4 h-4" />, className: "bg-brand-amber-900/50 text-brand-amber-300 border-brand-amber-700" },
+        Lecture: { icon: <BookOpenIcon className="w-4 h-4" />, className: "bg-brand-amber-900/50 text-brand-amber-300 border-brand-amber-700" },
         Revision: { icon: <RepeatIcon className="w-4 h-4" />, className: "bg-green-900/50 text-green-300 border-green-700" },
         Practice: { icon: <TargetIcon className="w-4 h-4" />, className: "bg-brand-orange-900/50 text-brand-orange-400 border-brand-orange-700" },
+        SpacedRevision: { icon: <BrainCircuitIcon className="w-4 h-4" />, className: "bg-cyan-900/50 text-cyan-300 border-cyan-700" },
     };
     const { icon, className } = typeStyles[type];
     return (
         <span className={cn("flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full border", className)}>
             {icon}
-            {type}
+            {type === 'SpacedRevision' ? 'Spaced Rev.' : type}
         </span>
     );
 };
@@ -105,7 +106,13 @@ const Timeline: React.FC = () => {
     const [testPlans] = useLocalStorage<TestPlan[]>('testPlans', []);
     const [showCompleted, setShowCompleted] = useState(false);
 
-    const { overdueItems, todayItems, upcomingGrouped, completedTodayTasks } = useMemo(() => {
+    // Fix: Added an explicit return type to useMemo to help TypeScript correctly infer the types.
+    const { overdueItems, todayItems, upcomingGrouped, completedTodayTasks } = useMemo<{
+        overdueItems: AgendaItem[];
+        todayItems: AgendaItem[];
+        upcomingGrouped: Record<string, AgendaItem[]>;
+        completedTodayTasks: Task[];
+    }>(() => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
@@ -232,7 +239,8 @@ const Timeline: React.FC = () => {
             
              {showCompleted && (
                 <div className="mt-12">
-                    {renderSection("Completed Today", completedTodayTasks.map(task => ({ id: task.id, type: 'task', data: task, date: new Date() })), "bg-green-500", true)}
+                    {/* Fix: Cast `completedTodayTasks` to Task[] to resolve TypeScript inference issue where it was treated as `unknown`. */}
+                    {renderSection("Completed Today", (completedTodayTasks as Task[]).map(task => ({ id: task.id, type: 'task', data: task, date: new Date() })), "bg-green-500", true)}
                 </div>
             )}
         </div>

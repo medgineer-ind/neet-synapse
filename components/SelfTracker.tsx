@@ -3,7 +3,7 @@ import { Task, TestPlan, SubjectName, ProgressStats, ChapterStats, SubjectStats,
 import { Card } from './ui/StyledComponents';
 import { calculateProgress, calculateOverallScore, getScoreBgClass, getScoreColorClass } from '../lib/utils';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend, ResponsiveContainer, Tooltip } from 'recharts';
-import { ActivityIcon, CheckCircleIcon, TargetIcon, ZapIcon, AtomIcon, FlaskConicalIcon, DnaIcon, LeafIcon, TrophyIcon } from './ui/Icons';
+import { ActivityIcon, CheckCircleIcon, TargetIcon, ZapIcon, AtomIcon, FlaskConicalIcon, DnaIcon, LeafIcon, TrophyIcon, BrainCircuitIcon, RepeatIcon, AlertTriangleIcon } from './ui/Icons';
 import { cn } from '../lib/utils';
 import { syllabus } from '../data/syllabus';
 
@@ -11,6 +11,40 @@ interface SelfTrackerProps {
     tasks: Task[];
     testPlans: TestPlan[];
 }
+
+const OverdueRevisionsWarning: React.FC<{ overdueRevisions: Task[] }> = ({ overdueRevisions }) => {
+    if (overdueRevisions.length === 0) {
+        return null;
+    }
+
+    return (
+        <Card className="p-6 border-l-4 border-red-500 bg-red-900/20 animate-fadeIn">
+            <div className="flex items-start gap-4">
+                <AlertTriangleIcon className="w-8 h-8 text-red-400 flex-shrink-0 mt-1" />
+                <div>
+                    <h2 className="font-display text-xl font-semibold text-red-400">
+                        Action Required: {overdueRevisions.length} Overdue Revision{overdueRevisions.length > 1 ? 's' : ''}
+                    </h2>
+                    <p className="text-sm text-gray-300 mt-2">
+                        You have missed critical spaced revision tasks. Completing these on schedule is essential for moving information to your long-term memory and will <strong className="text-white">severely impact your recall ability and exam results</strong> if ignored.
+                    </p>
+                    <div className="mt-4 max-h-40 overflow-y-auto space-y-2 pr-2">
+                        {overdueRevisions.slice(0, 5).map(task => (
+                            <div key={task.id} className="p-2 bg-black/30 rounded-md text-xs">
+                                <p className="font-semibold text-gray-200">{task.name}</p>
+                                <p className="text-gray-400">Scheduled for: {new Date(new Date(task.date).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString()}</p>
+                            </div>
+                        ))}
+                        {overdueRevisions.length > 5 && <p className="text-xs text-center text-gray-400 mt-2">...and {overdueRevisions.length - 5} more.</p>}
+                    </div>
+                     <p className="text-sm text-gray-300 mt-3">
+                        Go to your <strong className="text-white">Planner or Agenda</strong> to reschedule or complete them now.
+                    </p>
+                </div>
+            </div>
+        </Card>
+    );
+};
 
 const MomentumGauge: React.FC<{ score: number }> = ({ score }) => {
     const rotation = (score / 100) * 180 - 90;
@@ -274,6 +308,18 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
         return data;
     }, [progressStats, testPlans]);
 
+    const overdueRevisions = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return tasks
+            .filter(t => 
+                t.taskType === 'SpacedRevision' && 
+                t.status === 'Pending' && 
+                new Date(new Date(t.date).toLocaleString("en-US", { timeZone: "UTC" })) < today
+            )
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }, [tasks]);
+
     const achievements = useMemo(() => {
         const completedTasks = tasks.filter(t => t.status === 'Completed');
         const todayStr = new Date().toISOString().split('T')[0];
@@ -295,6 +341,48 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
                 isUnlocked: allCompleted
             };
         });
+        
+        const todaysRevisions = tasks.filter(t => t.taskType === 'SpacedRevision' && t.date === todayStr);
+        const allTodaysRevisionsCompleted = todaysRevisions.length > 0 && todaysRevisions.every(t => t.status === 'Completed');
+
+        const revisionDays = tasks.reduce((acc, task) => {
+            if (task.taskType === 'SpacedRevision') {
+                if (!acc[task.date]) {
+                    acc[task.date] = { total: 0, completed: 0 };
+                }
+                acc[task.date].total++;
+                if (task.status === 'Completed') {
+                    acc[task.date].completed++;
+                }
+            }
+            return acc;
+        }, {} as Record<string, { total: number; completed: number }>);
+
+        const perfectRevisionDays = Object.keys(revisionDays)
+            .filter(dateStr => revisionDays[dateStr].total > 0 && revisionDays[dateStr].total === revisionDays[dateStr].completed)
+            .sort();
+        
+        let revisionStreak = 0;
+        if (perfectRevisionDays.length > 0) {
+            const today = new Date();
+            const yesterday = new Date();
+            yesterday.setDate(today.getDate() - 1);
+            const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+            if (perfectRevisionDays.includes(todayStr) || perfectRevisionDays.includes(yesterdayStr)) {
+                revisionStreak = 1;
+                for (let i = perfectRevisionDays.length - 1; i > 0; i--) {
+                    const current = new Date(perfectRevisionDays[i]);
+                    const prev = new Date(perfectRevisionDays[i - 1]);
+                    if ((current.getTime() - prev.getTime()) / (1000 * 3600 * 24) === 1) {
+                        revisionStreak++;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
 
         const tasksByDate = tasks.reduce((acc: Record<string, Task[]>, task) => {
             const dateStr = task.date;
@@ -324,11 +412,10 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
             }
         }
         
-        const studyDays: string[] = [...new Set(
-            completedTasks
-                .reduce((acc: StudySession[], t) => acc.concat(t.sessions || []), [] as StudySession[])
-                .map(s => s.date.split('T')[0])
-        )].sort();
+        // Fix: Replaced reduce/map chain with flatMap for better readability and type safety.
+        const allSessionDates = completedTasks.flatMap(task => (task.sessions || []).map(session => session.date.split('T')[0]));
+        // Fix: Changed from spread syntax to Array.from() to fix a TypeScript type inference issue where Set spread results in unknown[].
+        const studyDays: string[] = Array.from(new Set(allSessionDates)).sort();
         let consistencyStreak = 0;
         if (studyDays.length > 0) {
             consistencyStreak = 1;
@@ -378,6 +465,18 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
 
         return [
             ...dailyAchievements,
+            {
+                name: `Daily Revisionist`,
+                description: `Complete all scheduled revisions today`,
+                icon: <BrainCircuitIcon className="w-6 h-6 text-cyan-400" />,
+                isUnlocked: allTodaysRevisionsCompleted
+            },
+            {
+                name: `${revisionStreak}-Day Revision Streak`,
+                description: "Complete all revisions on consecutive days",
+                icon: <RepeatIcon className="w-6 h-6 text-cyan-400" />,
+                isUnlocked: revisionStreak > 1
+            },
             { name: `${completionStreak}-Day Streak`, description: "Complete all daily tasks", icon: <CheckCircleIcon className="w-6 h-6 text-brand-amber-400" />, isUnlocked: completionStreak > 1 },
             { name: `${consistencyStreak}-Day Streak`, description: "Study on consecutive days", icon: <ActivityIcon className="w-6 h-6 text-yellow-400" />, isUnlocked: consistencyStreak > 1 },
             { name: "Accuracy Ace", description: `High accuracy streak (${accuracyStreak})`, icon: <TargetIcon className="w-6 h-6 text-green-400" />, isUnlocked: accuracyStreak >= 3 },
@@ -393,6 +492,8 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
     return (
         <div className="space-y-8">
             <h1 className="font-display text-4xl font-bold text-brand-amber-400 tracking-wide">Self Tracker</h1>
+            
+            <OverdueRevisionsWarning overdueRevisions={overdueRevisions} />
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <MomentumGauge score={momentumScore} />

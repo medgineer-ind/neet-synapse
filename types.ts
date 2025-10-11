@@ -2,7 +2,7 @@
 
 // Fix: Removed self-import of `SubjectName` and `TaskType` which conflicted with local declarations.
 export type SubjectName = 'Physics' | 'Chemistry' | 'Botany' | 'Zoology';
-export type TaskType = 'Study' | 'Revision' | 'Practice';
+export type TaskType = 'Lecture' | 'Revision' | 'Practice' | 'SpacedRevision';
 export type TaskStatus = 'Pending' | 'Completed';
 export type Theme = 'light' | 'dark';
 export type Priority = 'Low' | 'Medium' | 'High';
@@ -11,6 +11,14 @@ export interface StudySession {
   date: string; // ISO string
   duration: number; // in seconds
 }
+
+export interface RevisionAttempt {
+  revisionDay: number;
+  date: string; // ISO string
+  duration: number; // in seconds
+  difficulty: number; // 1-5
+}
+
 
 export interface Task {
   id: string;
@@ -29,6 +37,9 @@ export interface Task {
   notes?: string;
   originalDate?: string;
   sessions: StudySession[];
+  sourceLectureTaskId?: string;
+  revisionDay?: number; // 3, 5, 7, 15, 30
+  revisionHistory?: RevisionAttempt[];
 }
 
 export type Syllabus = {

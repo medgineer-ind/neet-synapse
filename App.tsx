@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Link, useLocation } from 'react-router-dom';
 import Planner from './components/Planner';
@@ -9,11 +10,11 @@ import Mentor from './components/Mentor';
 import SelfTracker from './components/SelfTracker';
 import Insights from './components/Insights';
 import { ClipboardListIcon, LayoutDashboardIcon, SettingsIcon, FileTextIcon, CalendarClockIcon, PlayIcon, PauseIcon, StopCircleIcon, MegaphoneIcon, XIcon, BrainCircuitIcon, ActivityIcon, HistoryIcon, AlertTriangleIcon } from './components/ui/Icons';
-import { Task, ActiveTimer, StudySession, TestPlan, TopicPracticeAttempt } from './types';
+import { Task, ActiveTimer, StudySession, TestPlan, TopicPracticeAttempt, RevisionAttempt } from './types';
 import LiveBackground from './components/LiveBackground';
 import useLocalStorage from './hooks/useLocalStorage';
 import useStorageUsage from './hooks/useStorageUsage';
-import { generatePerformanceSummary, formatDuration } from './lib/utils';
+import { generatePerformanceSummary, formatDuration, cn } from './lib/utils';
 import { Button, Modal, Input } from './components/ui/StyledComponents';
 import { TimeEditor } from './components/ui/TimeEditor';
 
@@ -316,7 +317,7 @@ const ConfirmSessionModal: React.FC<{
     );
 };
 
-const CompleteStudyModal: React.FC<{ 
+const CompleteLectureModal: React.FC<{ 
     task: Task | null; 
     initialDuration: number;
     onComplete: (difficulty: number, duration: number) => void; 
@@ -413,6 +414,87 @@ const CompletePracticeModal: React.FC<{
     );
 };
 
+const SpacedRevisionModal: React.FC<{
+    task: Task | null;
+    onClose: () => void;
+    onComplete: (revisionTask: Task, duration: number, difficulty: number) => void;
+}> = ({ task, onClose, onComplete }) => {
+    const targetTimes: { [key: number]: number } = { 3: 15 * 60, 5: 10 * 60, 7: 5 * 60, 15: 5 * 60, 30: 5 * 60 };
+    const targetDuration = task?.revisionDay ? targetTimes[task.revisionDay] : 0;
+
+    const [time, setTime] = useState(0);
+    const [isActive, setIsActive] = useState(true);
+    const [difficulty, setDifficulty] = useState(3);
+
+    useEffect(() => {
+        // Fix: Changed NodeJS.Timeout to ReturnType<typeof setInterval> for browser compatibility.
+        let interval: ReturnType<typeof setInterval> | null = null;
+        if (isActive) {
+            interval = setInterval(() => {
+                setTime(prevTime => prevTime + 1);
+            }, 1000);
+        } else if (!isActive && time !== 0) {
+            clearInterval(interval!);
+        }
+        return () => clearInterval(interval!);
+    }, [isActive, time]);
+    
+    useEffect(() => {
+        setTime(0);
+        setIsActive(true);
+        setDifficulty(3);
+    }, [task]);
+
+    if (!task) return null;
+    
+    const timeRemaining = targetDuration - time;
+    const isOverTime = timeRemaining < 0;
+    const urgencyThreshold = targetDuration * 0.2; // 20% remaining
+    const isUrgent = !isOverTime && timeRemaining <= urgencyThreshold;
+
+    const displayTime = isOverTime ? `+${formatDuration(time - targetDuration)}` : formatDuration(timeRemaining);
+
+    const modalBorderClass = isOverTime 
+        ? 'border-red-500/80 shadow-glow-amber-lg animate-pulseGlow' 
+        : isUrgent 
+        ? 'border-yellow-500/80 animate-pulseGlow' 
+        : 'border-cyan-400/20';
+
+    const handleComplete = () => {
+        setIsActive(false);
+        onComplete(task, time, difficulty);
+    };
+
+    return (
+        <Modal isOpen={!!task} onClose={onClose} title={`Grab It Completely: ${task.name}`} maxWidth="max-w-xl">
+             <div className={cn("relative bg-slate-900/80 backdrop-blur-2xl border-2 rounded-lg p-6 w-full my-8 transition-all duration-500", modalBorderClass)}>
+                <div className="text-center">
+                    <p className="font-display text-lg text-gray-400">Target Time: {formatDuration(targetDuration)}</p>
+                    <p className="font-display font-bold text-7xl my-4 tracking-wider">{displayTime}</p>
+                    {isOverTime && <p className="text-red-400 font-bold text-lg animate-fadeIn">DANGER: TIME OVER LIMIT!</p>}
+                    {isUrgent && <p className="text-yellow-400 font-bold text-lg animate-fadeIn">HURRY UP!</p>}
+                </div>
+
+                <div className="my-8">
+                    <label className="block mb-2 font-display text-lg text-center">How difficult did you feel instantly?</label>
+                    <div className="flex items-center gap-4 my-4">
+                        <span className="text-sm text-gray-400">Easy</span>
+                        <input type="range" min="1" max="5" value={difficulty} onChange={e => setDifficulty(Number(e.target.value))} className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer range-lg accent-cyan-500" />
+                        <span className="text-sm text-gray-400">Hard</span>
+                        <span className="font-bold text-cyan-400 text-2xl w-8 text-center">{difficulty}</span>
+                    </div>
+                </div>
+
+                <div className="flex justify-center gap-4 mt-6">
+                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button onClick={handleComplete} className="bg-cyan-500 text-cyan-900 hover:bg-cyan-400 focus:ring-cyan-500 shadow-glow-amber">Finish Revision</Button>
+                </div>
+            </div>
+        </Modal>
+    )
+};
+
+
 const App: React.FC = () => {
     const [tasks, setTasks] = useLocalStorage<Task[]>('tasks', []);
     const [testPlans, setTestPlans] = useLocalStorage<TestPlan[]>('testPlans', []);
@@ -422,6 +504,7 @@ const App: React.FC = () => {
     const [sessionToConfirm, setSessionToConfirm] = useState<{ task: Task; duration: number } | null>(null);
     const [completedTestInfo, setCompletedTestInfo] = useState<{ test: TestPlan, duration: number } | null>(null);
     const [targetScore, setTargetScore] = useLocalStorage<number>('targetScore', 680);
+    const [revisingTask, setRevisingTask] = useState<Task | null>(null);
     const { usagePercentage, refreshUsage } = useStorageUsage();
     const location = useLocation();
 
@@ -456,6 +539,11 @@ const App: React.FC = () => {
                     } else if (!t.sessions) {
                          needsUpdate = true;
                          task.sessions = [];
+                    }
+
+                    if (task.taskType === ('Study' as any)) {
+                        needsUpdate = true;
+                        task.taskType = 'Lecture';
                     }
 
                     return task;
@@ -547,8 +635,10 @@ const App: React.FC = () => {
     };
 
     // --- Task Completion Logic ---
-     const handleCompleteStudy = (difficulty: number, duration: number) => {
+     const handleCompleteLecture = (difficulty: number, duration: number) => {
         if (!taskToComplete) return;
+
+        const originalTask = taskToComplete;
 
         if (taskToFinalize) { // This is a new task from the TestPlanner timer
             const performanceSummary = generatePerformanceSummary(difficulty, undefined, undefined, duration);
@@ -560,35 +650,72 @@ const App: React.FC = () => {
                 sessions: [{ date: new Date().toISOString(), duration: duration }],
             };
             setTasks(prev => [...prev, finalTask].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
-
-            const testNameMatch = taskToFinalize.task.notes.match(/For upcoming test: "([^"]+)"/);
-            if (testNameMatch) {
-                const testName = testNameMatch[1];
-                setTestPlans(prevTests => prevTests.map(test => {
-                    if (test.name === testName && test.status === 'Upcoming') {
-                        const updatedTopicStatus = test.topicStatus.map(topic => {
-                            if (
-                                topic.subject === taskToFinalize.task.subject &&
-                                topic.chapter === taskToFinalize.task.chapter &&
-                                taskToFinalize.task.microtopics.includes(topic.microtopic)
-                            ) {
-                                return { ...topic, revisionDifficulty: difficulty };
-                            }
-                            return topic;
-                        });
-                        return { ...test, topicStatus: updatedTopicStatus };
-                    }
-                    return test;
-                }));
-            }
         } else { // This is an existing task from the Planner
             const performanceSummary = generatePerformanceSummary(difficulty, undefined, undefined, duration);
             const updatedNotes = (taskToComplete.notes || '') + performanceSummary;
             setTasks(prevTasks => prevTasks.map(t => t.id === taskToComplete.id ? { ...t, status: 'Completed', difficulty, notes: updatedNotes, sessions: [{ date: t.date, duration }] } : t));
         }
         
+        // Spaced Repetition Logic for Lectures
+        if (originalTask.taskType === 'Lecture') {
+            const revisionDays = [3, 5, 7, 15, 30];
+            const newRevisionTasks: Task[] = revisionDays.map(day => {
+                const revisionDate = new Date();
+                revisionDate.setDate(revisionDate.getDate() + day);
+                
+                return {
+                    id: crypto.randomUUID(),
+                    name: `Grab It: Day ${day} Revision`,
+                    subject: originalTask.subject,
+                    chapter: originalTask.chapter,
+                    microtopics: originalTask.microtopics,
+                    taskType: 'SpacedRevision',
+                    date: revisionDate.toISOString().split('T')[0],
+                    status: 'Pending',
+                    priority: 'High',
+                    sessions: [],
+                    sourceLectureTaskId: originalTask.id,
+                    revisionDay: day,
+                };
+            });
+            setTasks(prev => [...prev, ...newRevisionTasks].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+        }
+
         setTaskToComplete(null);
         setTaskToFinalize(null);
+    };
+
+    const handleCompleteRevision = (revisionTask: Task, duration: number, difficulty: number) => {
+        setTasks(prevTasks => {
+            const tasksCopy = [...prevTasks];
+            
+            // Update original lecture task with revision history
+            const originalLectureTaskIndex = tasksCopy.findIndex(t => t.id === revisionTask.sourceLectureTaskId);
+            if (originalLectureTaskIndex !== -1) {
+                const newAttempt: RevisionAttempt = {
+                    revisionDay: revisionTask.revisionDay!,
+                    date: new Date().toISOString(),
+                    duration,
+                    difficulty,
+                };
+                const originalTask = { ...tasksCopy[originalLectureTaskIndex] };
+                originalTask.revisionHistory = [...(originalTask.revisionHistory || []), newAttempt];
+                tasksCopy[originalLectureTaskIndex] = originalTask;
+            }
+            
+            // Update the revision task itself to be completed
+            const revisionTaskIndex = tasksCopy.findIndex(t => t.id === revisionTask.id);
+            if (revisionTaskIndex !== -1) {
+                const updatedRevisionTask = { ...tasksCopy[revisionTaskIndex] };
+                updatedRevisionTask.status = 'Completed';
+                updatedRevisionTask.sessions = [{ date: new Date().toISOString(), duration }];
+                updatedRevisionTask.difficulty = difficulty;
+                tasksCopy[revisionTaskIndex] = updatedRevisionTask;
+            }
+    
+            return tasksCopy;
+        });
+        setRevisingTask(null);
     };
 
     const handleCompletePractice = (total: number, correct: number, duration: number, incorrectCount: number) => {
@@ -674,6 +801,7 @@ const App: React.FC = () => {
                             activeTimer={activeTimer}
                             startTimer={startTaskTimer}
                             onCompleteTask={setTaskToComplete}
+                            onStartRevision={setRevisingTask}
                         />
                     } />
                     <Route path="/test-planner" element={
@@ -713,10 +841,10 @@ const App: React.FC = () => {
                 onClose={() => setSessionToConfirm(null)}
             />
 
-            <CompleteStudyModal 
-                task={taskToComplete && (taskToComplete.taskType === 'Study' || taskToComplete.taskType === 'Revision') ? taskToComplete : null}
+            <CompleteLectureModal 
+                task={taskToComplete && (taskToComplete.taskType === 'Lecture' || taskToComplete.taskType === 'Revision') ? taskToComplete : null}
                 initialDuration={completionTaskDuration}
-                onComplete={handleCompleteStudy}
+                onComplete={handleCompleteLecture}
                 onClose={closeCompletionModals}
             />
             <CompletePracticeModal 
@@ -724,6 +852,11 @@ const App: React.FC = () => {
                 initialDuration={completionTaskDuration}
                 onComplete={handleCompletePractice}
                 onClose={closeCompletionModals}
+            />
+            <SpacedRevisionModal
+                task={revisingTask}
+                onClose={() => setRevisingTask(null)}
+                onComplete={handleCompleteRevision}
             />
         </div>
     );
