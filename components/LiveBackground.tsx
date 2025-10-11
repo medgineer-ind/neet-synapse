@@ -14,8 +14,10 @@ const LiveBackground: React.FC = () => {
         const numParticles = 70;
         
         const resizeCanvas = () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+            if (canvas) {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
         };
 
         class Particle {
@@ -34,6 +36,7 @@ const LiveBackground: React.FC = () => {
             }
 
             update() {
+                if (!canvas) return;
                 if (this.x > canvas.width || this.x < 0) this.speedX = -this.speedX;
                 if (this.y > canvas.height || this.y < 0) this.speedY = -this.speedY;
                 this.x += this.speedX;
@@ -50,6 +53,7 @@ const LiveBackground: React.FC = () => {
         }
 
         const init = () => {
+            if (!canvas) return;
             particles = [];
             for (let i = 0; i < numParticles; i++) {
                 const size = Math.random() * 1.5 + 0.5;
@@ -62,7 +66,7 @@ const LiveBackground: React.FC = () => {
         };
 
         const connect = () => {
-            if(!ctx) return;
+            if(!ctx || !canvas) return;
             let opacityValue = 1;
             for (let a = 0; a < particles.length; a++) {
                 for (let b = a; b < particles.length; b++) {
@@ -84,7 +88,7 @@ const LiveBackground: React.FC = () => {
         };
 
         const animate = () => {
-            if(!ctx) return;
+            if(!ctx || !canvas) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             particles.forEach(particle => {
                 particle.update();
@@ -109,7 +113,28 @@ const LiveBackground: React.FC = () => {
         };
     }, []);
 
-    return <canvas ref={canvasRef} className="fixed top-0 left-0 w-full h-full -z-20" />;
+    return (
+        <div className="fixed top-0 left-0 w-full h-full -z-20">
+            <video
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="absolute top-0 left-0 w-full h-full object-contain"
+                src="./background.mp4"
+            >
+                <source src="./background.mp4" type="video/mp4" />
+                Your browser does not support the video tag.
+            </video>
+            {/* Overlay to dim the video and improve text readability */}
+            <div className="absolute top-0 left-0 w-full h-full bg-slate-950/70" />
+            
+            <canvas 
+                ref={canvasRef} 
+                className="absolute top-0 left-0 w-full h-full" 
+            />
+        </div>
+    );
 };
 
 export default LiveBackground;

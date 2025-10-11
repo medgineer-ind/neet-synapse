@@ -78,7 +78,7 @@ const AgendaItemCard: React.FC<{ item: AgendaItem; isCompleted?: boolean }> = ({
                     <div className="flex-1 min-w-0">
                         <p className="font-semibold" title={data.name}>{data.name}</p>
                         <p className="text-xs text-gray-400" title={(data as Task).microtopics.join(', ')}>
-                           {(data as Task).subject} &gt {(data as Task).chapter}
+                           {(data as Task).subject} {'>'} {(data as Task).chapter}
                         </p>
                     </div>
                     <div className="flex items-center gap-2 self-start sm:self-center flex-shrink-0">

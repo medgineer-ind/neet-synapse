@@ -767,16 +767,17 @@ const App: React.FC = () => {
         db.transaction('rw', db.tasks, async () => {
              if (taskToFinalize) { // New task from TestPlanner
                 const performanceSummary = generatePerformanceSummary(difficulty, undefined, undefined, duration);
-                const finalTask: Omit<Task, 'id'> = {
+                // FIX: Object literal may only specify known properties, and 'id' does not exist in type 'Omit<Task, "id">'.
+                // The original logic was incorrect. A new Task needs a unique ID to be added to the database.
+                const finalTask: Task = {
                     ...taskToFinalize.task,
-                    id: undefined as any, // Dexie will auto-generate
+                    id: crypto.randomUUID(),
                     status: 'Completed',
                     difficulty,
                     notes: (taskToFinalize.task.notes || '') + performanceSummary,
                     sessions: [{ date: new Date().toISOString(), duration }],
                 };
-                delete (finalTask as any).id;
-                const newTaskId = await db.tasks.add(finalTask as Task);
+                const newTaskId = await db.tasks.add(finalTask);
                 
                 if (originalTask.taskType === 'Lecture') {
                     await createSpacedRevisionTasks(originalTask, newTaskId);
@@ -809,7 +810,9 @@ const App: React.FC = () => {
         const existingRevisions = await db.tasks.where({ sourceLectureTaskId: sourceTaskId as string }).toArray();
         const existingDays = new Set(existingRevisions.map(t => t.revisionDay));
 
-        const newRevisionTasks = revisionDays
+        // FIX: Explicitly type `newRevisionTasks` as `Task[]` to prevent TypeScript
+        // from inferring `taskType` as a generic `string` instead of the specific `TaskType`.
+        const newRevisionTasks: Task[] = revisionDays
             .filter(day => !existingDays.has(day))
             .map(day => {
                 const revisionDate = new Date();
@@ -890,9 +893,11 @@ const App: React.FC = () => {
 
         if (taskToFinalize) { // New task from TestPlanner timer
             const performanceSummary = generatePerformanceSummary(undefined, total, correct, duration, incorrectCount);
-             const finalTask: Omit<Task, 'id'> = {
+             // FIX: Object literal may only specify known properties, and 'id' does not exist in type 'Omit<Task, "id">'.
+             // The original logic was incorrect. A new Task needs a unique ID to be added to the database.
+             const finalTask: Task = {
                 ...taskToFinalize.task,
-                id: undefined as any,
+                id: crypto.randomUUID(),
                 status: 'Completed',
                 totalQuestions: total,
                 correctAnswers: correct,
@@ -900,8 +905,7 @@ const App: React.FC = () => {
                 notes: (taskToFinalize.task.notes || '') + performanceSummary,
                 sessions: [{ date: new Date().toISOString(), duration: duration }],
             };
-            delete (finalTask as any).id;
-            db.tasks.add(finalTask as Task);
+            db.tasks.add(finalTask);
 
             const testNameMatch = taskToFinalize.task.notes.match(/For upcoming test: "([^"]+)"/);
             if (testNameMatch) {
@@ -970,9 +974,8 @@ const App: React.FC = () => {
 
 
     return (
-        <div className="relative min-h-screen text-gray-200 font-sans bg-slate-950">
+        <div className="relative min-h-screen text-gray-200 font-sans">
             <LiveBackground />
-            <div className="absolute inset-0 -z-10 bg-gradient-to-br from-slate-950/95 via-slate-900/95 to-slate-950/95"></div>
             <Header />
             <AdminNotification />
             <StorageWarningBanner usagePercentage={usagePercentage} />
