@@ -1,32 +1,22 @@
 import { useState, useCallback } from 'react';
 
-// A conservative estimate of the localStorage limit in bytes (5MB)
-const STORAGE_LIMIT_BYTES = 5 * 1024 * 1024;
-
 function useStorageUsage() {
   const [usageMB, setUsageMB] = useState(0);
   const [usagePercentage, setUsagePercentage] = useState(0);
 
-  const calculateUsage = useCallback(() => {
-    let totalBytes = 0;
+  const calculateUsage = useCallback(async () => {
     try {
-      for (let i = 0; i < window.localStorage.length; i++) {
-        const key = window.localStorage.key(i);
-        if (key) {
-          const value = window.localStorage.getItem(key);
-          if (value) {
-            // Estimate size in bytes (UTF-16 characters are 2 bytes)
-            totalBytes += (key.length + value.length) * 2;
-          }
-        }
+      if (navigator.storage && navigator.storage.estimate) {
+        const estimate = await navigator.storage.estimate();
+        const usageBytes = estimate.usage || 0;
+        const quotaBytes = estimate.quota || 1; // Avoid division by zero
+        
+        const megabytes = usageBytes / (1024 * 1024);
+        setUsageMB(megabytes);
+        setUsagePercentage((usageBytes / quotaBytes) * 100);
       }
-      
-      const megabytes = totalBytes / (1024 * 1024);
-      setUsageMB(megabytes);
-      setUsagePercentage((totalBytes / STORAGE_LIMIT_BYTES) * 100);
-
     } catch (error) {
-      console.error("Could not calculate storage usage:", error);
+      console.error("Could not estimate storage usage:", error);
       setUsageMB(0);
       setUsagePercentage(0);
     }

@@ -101,7 +101,7 @@ export const LeafIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
 );
 
 export const DnaIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.01s.48-.93 1.34-1.34c.86-.41 2.03-.41 2.89 0 .86.41 1.34 1.34 1.34 1.34" /><path d="M14 4.01s.48.93 1.34 1.34c.86.41 2.03.41 2.89 0 .86-.41 1.34-1.34 1.34-1.34" /><path d="M8.03 9.01c-1 .5-1.97 1-1.97 2-.01.99.97 1.5 1.97 2" /><path d="M15.97 9.01c1 .5 1.97 1 1.97 2s-.97 1.5-1.97 2" /><path d="M12 12.01v4" /><path d="M4 20.01s.48.93 1.34 1.34c.86.41 2.03.41 2.89 0 .86-.41 1.34-1.34 1.34-1.34" /><path d="M14 10.01s.48-.93 1.34-1.34c.86-.41 2.03-.41 2.89 0 .86-.41 1.34 1.34 1.34 1.34" /><path d="M4.5 8.01c0-1.5.01-3 1.5-3s1.5 1.5 1.5 3" /><path d="M17.5 16.01c0 1.5.01 3 1.5 3s1.5-1.5 1.5-3" /></svg>
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.01s.48-.93 1.34-1.34c.86-.41 2.03-.41 2.89 0 .86.41 1.34 1.34 1.34 1.34" /><path d="M14 4.01s.48.93 1.34 1.34c.86.41 2.03.41 2.89 0 .86-.41 1.34-1.34 1.34-1.34" /><path d="M8.03 9.01c-1 .5-1.97 1-1.97 2-.01.99.97 1.5 1.97 2" /><path d="M15.97 9.01c1 .5 1.97 1 1.97 2s-.97 1.5-1.97 2" /><path d="M12 12.01v4" /><path d="M4 20.01s.48.93 1.34 1.34c.86.41 2.03.41 2.89 0 .86-.41 1.34-1.34 1.34-1.34" /><path d="M14 10.01s.48-.93 1.34-1.34c.86-.41 2.03-.41 2.89 0 .86.41 1.34 1.34 1.34 1.34" /><path d="M4.5 8.01c0-1.5.01-3 1.5-3s1.5 1.5 1.5 3" /><path d="M17.5 16.01c0 1.5.01 3 1.5 3s1.5-1.5 1.5-3" /></svg>
 );
 
 export const ChevronLeftIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
@@ -217,4 +217,12 @@ export const AlertTriangleIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props
         <path d="M12 9v4" />
         <path d="M12 17h.01" />
     </svg>
+);
+
+export const MaximizeIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+);
+
+export const MinimizeIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
 );

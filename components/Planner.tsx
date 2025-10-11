@@ -1,22 +1,36 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Task, TaskType, SubjectName, TestPlan, Priority, TaskStatus, ActiveTimer } from '../types';
-import useLocalStorage from '../hooks/useLocalStorage';
+import { Task, TaskType, SubjectName, TestPlan, Priority, TaskStatus, ActiveTimer, RevisionAttempt } from '../types';
 import { syllabus } from '../data/syllabus';
 import { cn, formatDuration } from '../lib/utils';
-import { PlusIcon, BookOpenIcon, RepeatIcon, TargetIcon, Trash2Icon, TrophyIcon, ClockIcon, PencilIcon, ChevronLeftIcon, ChevronRightIcon, FilterIcon, CalendarPlusIcon, StickyNoteIcon, ChevronDownIcon, PlayIcon, BrainCircuitIcon } from './ui/Icons';
+import { PlusIcon, BookOpenIcon, RepeatIcon, TargetIcon, Trash2Icon, TrophyIcon, ClockIcon, PencilIcon, ChevronLeftIcon, ChevronRightIcon, FilterIcon, CalendarPlusIcon, StickyNoteIcon, ChevronDownIcon, PlayIcon, BrainCircuitIcon, CheckCircleIcon, AlertTriangleIcon } from './ui/Icons';
 import { Card, Button, Select, Input, Textarea, Modal } from './ui/StyledComponents';
+import { db } from '../services/db';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 // --- Calendar Component ---
 const Calendar: React.FC<{
   selectedDate: Date;
   onDateChange: (date: Date) => void;
-  tasks: Task[];
-}> = ({ selectedDate, onDateChange, tasks }) => {
+}> = ({ selectedDate, onDateChange }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
+
+  const { monthStart, monthEnd } = useMemo(() => {
+    const start = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    const end = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+    return { 
+        monthStart: start.toISOString().split('T')[0],
+        monthEnd: end.toISOString().split('T')[0]
+    };
+  }, [currentMonth]);
+
+  const tasksForMonth = useLiveQuery(() => 
+      db.tasks.where('date').between(monthStart, monthEnd, true, true).toArray()
+  , [monthStart, monthEnd]);
 
   const taskDates = useMemo(() => {
     const dates = new Map<string, Priority>();
-    tasks.forEach(task => {
+    if (!tasksForMonth) return dates;
+    tasksForMonth.forEach(task => {
         const taskDate = new Date(new Date(task.date).toLocaleString("en-US", { timeZone: "UTC" })).toDateString();
         const priorityOrder: Record<Priority, number> = { High: 1, Medium: 2, Low: 3 };
         if (!dates.has(taskDate) || priorityOrder[task.priority] < priorityOrder[dates.get(taskDate)!]) {
@@ -24,7 +38,7 @@ const Calendar: React.FC<{
         }
     });
     return dates;
-  }, [tasks]);
+  }, [tasksForMonth]);
 
   useEffect(() => {
     setCurrentMonth(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
@@ -101,10 +115,9 @@ const Calendar: React.FC<{
 // --- TaskForm Component ---
 
 const TaskForm: React.FC<{
-    onAddTask: (task: Omit<Task, 'id' | 'status' | 'sessions'>) => void;
     selectedDate: Date;
     onDateChange: (date: Date) => void;
-}> = ({ onAddTask, selectedDate, onDateChange }) => {
+}> = ({ selectedDate, onDateChange }) => {
     const [name, setName] = useState<string>('');
     const [subject, setSubject] = useState<SubjectName>('Physics');
     const [chapter, setChapter] = useState<string>(Object.keys(syllabus.Physics)[0]);
@@ -163,7 +176,13 @@ const TaskForm: React.FC<{
             alert('Please enter a task name and select at least one microtopic.');
             return;
         }
-        onAddTask({ name, subject, chapter, microtopics, taskType, date, priority, notes });
+        const newTask: Task = {
+            id: crypto.randomUUID(),
+            name, subject, chapter, microtopics, taskType, date, priority, notes,
+            status: 'Pending',
+            sessions: [],
+        };
+        db.tasks.add(newTask);
         setName('');
         setNotes('');
         setMicrotopics([syllabus[subject][chapter][0]]);
@@ -272,11 +291,54 @@ const TaskItem: React.FC<{
     const isTimerActiveForThisTask = activeTimer?.task?.id === task.id;
     const totalDuration = useMemo(() => (task.sessions || []).reduce((sum, s) => sum + s.duration, 0), [task.sessions]);
     
+    const associatedRevisionTasks = useLiveQuery(
+        () => task.taskType === 'Lecture' && task.status === 'Completed'
+            ? db.tasks.where({ sourceLectureTaskId: task.id as string }).and(t => t.taskType === 'SpacedRevision').toArray()
+            : Promise.resolve([]), // Return a resolved promise with an empty array if not applicable
+        [task.id, task.taskType, task.status]
+    );
+
     const priorityClasses: Record<Priority, string> = {
         High: "border-l-red-500",
         Medium: "border-l-yellow-500",
         Low: "border-l-blue-500",
     };
+
+    const revisionDetails = useMemo(() => {
+        if (task.taskType !== 'Lecture' || task.status !== 'Completed' || !associatedRevisionTasks) {
+            return [];
+        }
+
+        const REVISION_SCHEDULE = [3, 5, 7, 15, 30];
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        return REVISION_SCHEDULE.map(day => {
+            const completedData = task.revisionHistory?.find(rev => rev.revisionDay === day);
+            if (completedData) {
+                return {
+                    day,
+                    status: 'Completed' as const,
+                    data: completedData,
+                };
+            }
+
+            const pendingTask = associatedRevisionTasks.find(revTask => revTask.revisionDay === day);
+            if (pendingTask) {
+                const taskDate = new Date(new Date(pendingTask.date).toLocaleString("en-US", { timeZone: "UTC" }));
+                return {
+                    day,
+                    status: taskDate < today ? 'Overdue' as const : 'Pending' as const,
+                    data: pendingTask,
+                };
+            }
+            
+            return null;
+        }).filter(Boolean);
+    }, [task, associatedRevisionTasks]);
+
+    const hasDetails = task.notes || task.originalDate || (task.taskType === 'Lecture' && revisionDetails.length > 0);
 
     return (
         <div className={cn(
@@ -345,17 +407,70 @@ const TaskItem: React.FC<{
                     <Button onClick={() => onDeleteTask(task.id)} variant="ghost" size="sm" className="p-2 hover:bg-red-500/10 hover:text-red-400" aria-label="Delete task">
                         <Trash2Icon className="w-4 h-4" />
                     </Button>
-                     {(task.notes || task.originalDate) && (
+                     {hasDetails && (
                         <Button onClick={() => setExpanded(prev => !prev)} variant="ghost" size="sm" className="p-2" aria-label="Show details">
                             <ChevronDownIcon className={cn("w-5 h-5 transition-transform", isExpanded && "rotate-180")} />
                         </Button>
                     )}
                 </div>
             </div>
-            {isExpanded && (task.notes || task.originalDate) && (
+            {isExpanded && hasDetails && (
                 <div className="px-4 pb-4 border-t border-white/10 text-sm text-gray-300 space-y-2 animate-fadeIn">
                     {task.originalDate && <p><strong className="text-gray-400 font-display">Originally planned for:</strong> {new Date(new Date(task.originalDate).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString()}</p>}
                     {task.notes && <div><strong className="text-gray-400 font-display">Notes:</strong><p className="whitespace-pre-wrap pl-2 mt-1 font-mono text-xs">{task.notes}</p></div>}
+                    {task.taskType === 'Lecture' && revisionDetails.length > 0 && (
+                        <div className="pt-3 mt-3 border-t border-white/10">
+                            <strong className="text-gray-400 font-display">Spaced Revision Progress:</strong>
+                            <div className="space-y-3 mt-2 pl-2">
+                                {revisionDetails.map(rev => {
+                                    if (!rev) return null;
+                                    const { day, status, data } = rev;
+                                    
+                                    if (status === 'Completed') {
+                                        const details = data as RevisionAttempt;
+                                        return (
+                                            <div key={day} className="flex items-start gap-3 text-xs">
+                                                <CheckCircleIcon className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+                                                <div>
+                                                    <p className="font-semibold text-gray-200">Day {day} Revision - Completed <span className="text-gray-400 font-normal">on {new Date(details.date).toLocaleDateString()}</span></p>
+                                                    <p className="text-gray-400">Difficulty: <span className="font-semibold text-gray-300">{details.difficulty}/5</span> | Duration: <span className="font-semibold text-gray-300">{formatDuration(details.duration)}</span></p>
+                                                    {details.notes && <p className="mt-1 p-2 bg-black/30 rounded whitespace-pre-wrap font-mono text-gray-300">{details.notes}</p>}
+                                                </div>
+                                            </div>
+                                        )
+                                    }
+                                    
+                                    const taskData = data as Task;
+                                    const scheduledDate = new Date(new Date(taskData.date).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString();
+
+                                    if (status === 'Pending') {
+                                        return (
+                                            <div key={day} className="flex items-start gap-3 text-xs">
+                                                <ClockIcon className="w-4 h-4 text-brand-amber-400 flex-shrink-0 mt-0.5" />
+                                                <div>
+                                                    <p className="font-semibold text-gray-300">Day {day} Revision - Pending</p>
+                                                    <p className="text-gray-400">Scheduled for {scheduledDate}</p>
+                                                </div>
+                                            </div>
+                                        )
+                                    }
+                                    
+                                    if (status === 'Overdue') {
+                                        return (
+                                             <div key={day} className="flex items-start gap-3 text-xs">
+                                                <AlertTriangleIcon className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                                                <div>
+                                                    <p className="font-semibold text-red-300">Day {day} Revision - Overdue</p>
+                                                    <p className="text-gray-400">Was scheduled for {scheduledDate}</p>
+                                                </div>
+                                            </div>
+                                        )
+                                    }
+                                    return null;
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
@@ -365,7 +480,7 @@ const TaskItem: React.FC<{
 
 // --- Modal Components ---
 
-const EditTaskModal: React.FC<{ task: Task | null; onUpdate: (task: Task) => void; onClose: () => void }> = ({ task, onUpdate, onClose }) => {
+const EditTaskModal: React.FC<{ task: Task | null; onClose: () => void }> = ({ task, onClose }) => {
     const [formData, setFormData] = useState<Partial<Task>>({});
 
     React.useEffect(() => {
@@ -423,7 +538,8 @@ const EditTaskModal: React.FC<{ task: Task | null; onUpdate: (task: Task) => voi
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.name?.trim() || !task) return;
-        onUpdate(formData as Task);
+        db.tasks.update(task.id, formData);
+        onClose();
     };
 
     return (
@@ -494,7 +610,7 @@ const EditTaskModal: React.FC<{ task: Task | null; onUpdate: (task: Task) => voi
     );
 };
 
-const RescheduleModal: React.FC<{ task: Task | null; onClose: () => void; onReschedule: (task: Task, newDate: string) => void }> = ({ task, onClose, onReschedule }) => {
+const RescheduleModal: React.FC<{ task: Task | null; onClose: () => void }> = ({ task, onClose }) => {
     const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
     
     useEffect(() => {
@@ -506,7 +622,8 @@ const RescheduleModal: React.FC<{ task: Task | null; onClose: () => void; onResc
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (task) {
-            onReschedule(task, newDate);
+            db.tasks.update(task.id, { date: newDate, originalDate: task.originalDate || task.date });
+            onClose();
         }
     };
     
@@ -524,8 +641,11 @@ const RescheduleModal: React.FC<{ task: Task | null; onClose: () => void; onResc
     );
 };
 
-const UpcomingTestDeadlines: React.FC<{ testPlans: TestPlan[] }> = ({ testPlans }) => {
+const UpcomingTestDeadlines: React.FC = () => {
+    const testPlans = useLiveQuery(() => db.testPlans.toArray(), []);
+
     const upcomingTestsWithProgress = useMemo(() => {
+        if (!testPlans) return [];
         return testPlans
             .filter(p => p.status === 'Upcoming')
             .map(test => {
@@ -552,7 +672,7 @@ const UpcomingTestDeadlines: React.FC<{ testPlans: TestPlan[] }> = ({ testPlans 
             .sort((a, b) => a.daysLeft - b.daysLeft);
     }, [testPlans]);
 
-    if (upcomingTestsWithProgress.length === 0) {
+    if (!upcomingTestsWithProgress || upcomingTestsWithProgress.length === 0) {
         return null;
     }
 
@@ -595,30 +715,28 @@ type FilterState = {
 }
 
 interface PlannerProps {
-    tasks: Task[];
-    setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
     activeTimer: ActiveTimer | null;
     startTimer: (task: Task) => void;
     onCompleteTask: (task: Task) => void;
     onStartRevision: (task: Task) => void;
 }
 
-const Planner: React.FC<PlannerProps> = ({ tasks, setTasks, activeTimer, startTimer, onCompleteTask, onStartRevision }) => {
-    const [testPlans] = useLocalStorage<TestPlan[]>('testPlans', []);
+const Planner: React.FC<PlannerProps> = ({ activeTimer, startTimer, onCompleteTask, onStartRevision }) => {
     const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
     const [taskToReschedule, setTaskToReschedule] = useState<Task | null>(null);
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [filters, setFilters] = useState<FilterState>({ subject: 'All', type: 'All', priority: 'All', status: 'All' });
     
+    const testPlans = useLiveQuery(() => db.testPlans.where('status').equals('Upcoming').toArray(), []);
+
     const upcomingTestTopics = useMemo(() => {
+        if (!testPlans) return new Set<string>();
         const topicSet = new Set<string>();
-        testPlans
-            .filter(p => p.status === 'Upcoming')
-            .forEach(p => {
-                p.topicStatus.forEach(topic => {
-                    topicSet.add(`${topic.subject}-${topic.chapter}-${topic.microtopic}`);
-                });
+        testPlans.forEach(p => {
+            p.topicStatus.forEach(topic => {
+                topicSet.add(`${topic.subject}-${topic.chapter}-${topic.microtopic}`);
             });
+        });
         return topicSet;
     }, [testPlans]);
 
@@ -628,55 +746,37 @@ const Planner: React.FC<PlannerProps> = ({ tasks, setTasks, activeTimer, startTi
         );
     };
 
-    const addTask = (taskData: Omit<Task, 'id' | 'status' | 'sessions'>) => {
-        const newTask: Task = {
-            ...taskData,
-            id: crypto.randomUUID(),
-            status: 'Pending',
-            sessions: [],
-        };
-        setTasks(prevTasks => [...prevTasks, newTask].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
-    };
-
     const handleDeleteTask = (id: string) => {
         if (window.confirm('Are you sure you want to delete this task?')) {
-            setTasks(prevTasks => prevTasks.filter(task => task.id !== id));
+            db.tasks.delete(id);
         }
     };
-
-    const handleSaveTaskUpdate = (updatedTask: Task) => {
-        setTasks(prevTasks => {
-            const newTasks = prevTasks.map(t => t.id === updatedTask.id ? updatedTask : t);
-            return newTasks.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        });
-        setTaskToEdit(null);
-    };
-
-    const handleConfirmReschedule = (task: Task, newDate: string) => {
-        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: newDate, originalDate: t.originalDate || t.date } : t)
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
-        setTaskToReschedule(null);
-    };
     
-    const tasksForSelectedDate = useMemo(() => {
+    const tasksForSelectedDate = useLiveQuery(() => {
+        const selectedDateString = selectedDate.toISOString().split('T')[0];
+        return db.tasks.where('date').equals(selectedDateString).toArray();
+    }, [selectedDate]);
+
+    const filteredAndSortedTasks = useMemo(() => {
+        if (!tasksForSelectedDate) return [];
         const priorityOrder: Record<Priority, number> = { 'High': 1, 'Medium': 2, 'Low': 3 };
-        return tasks.filter(task => {
-            const taskDate = new Date(new Date(task.date).toLocaleString("en-US", { timeZone: "UTC" }));
-            const dateMatch = taskDate.toDateString() === selectedDate.toDateString();
+
+        return tasksForSelectedDate.filter(task => {
             const subjectMatch = filters.subject === 'All' || task.subject === filters.subject;
             const typeMatch = filters.type === 'All' || task.taskType === filters.type;
             const priorityMatch = filters.priority === 'All' || task.priority === filters.priority;
             const statusMatch = filters.status === 'All' || task.status === filters.status;
-            return dateMatch && subjectMatch && typeMatch && priorityMatch && statusMatch;
+            return subjectMatch && typeMatch && priorityMatch && statusMatch;
         }).sort((a, b) => (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3));
-    }, [tasks, selectedDate, filters]);
+    }, [tasksForSelectedDate, filters]);
+
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
-                <TaskForm onAddTask={addTask} selectedDate={selectedDate} onDateChange={setSelectedDate} />
+                <TaskForm selectedDate={selectedDate} onDateChange={setSelectedDate} />
 
-                <UpcomingTestDeadlines testPlans={testPlans} />
+                <UpcomingTestDeadlines />
 
                 <div>
                     <h2 className="font-display text-2xl font-bold text-brand-amber-400 mb-4 tracking-wide">
@@ -712,14 +812,14 @@ const Planner: React.FC<PlannerProps> = ({ tasks, setTasks, activeTimer, startTi
                         </div>
                     </Card>
 
-                    {tasksForSelectedDate.length === 0 ? (
+                    {filteredAndSortedTasks.length === 0 ? (
                         <Card className="p-10 text-center text-gray-400 mt-4">
                             <p className="font-display text-lg">No tasks match your criteria for this day.</p>
                             <p className="text-sm">Try adjusting the filters or planning a new task!</p>
                         </Card>
                     ) : (
                         <div className="space-y-3">
-                            {tasksForSelectedDate.map(task => (
+                            {filteredAndSortedTasks.map(task => (
                                 <TaskItem 
                                     key={task.id} 
                                     task={task} 
@@ -739,18 +839,16 @@ const Planner: React.FC<PlannerProps> = ({ tasks, setTasks, activeTimer, startTi
             </div>
             
             <div className="lg:col-span-1">
-                <Calendar selectedDate={selectedDate} onDateChange={setSelectedDate} tasks={tasks} />
+                <Calendar selectedDate={selectedDate} onDateChange={setSelectedDate} />
             </div>
 
             <EditTaskModal 
                 task={taskToEdit}
-                onUpdate={handleSaveTaskUpdate}
                 onClose={() => setTaskToEdit(null)}
             />
             <RescheduleModal
                 task={taskToReschedule}
                 onClose={() => setTaskToReschedule(null)}
-                onReschedule={handleConfirmReschedule}
             />
         </div>
     );

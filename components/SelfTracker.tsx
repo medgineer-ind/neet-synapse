@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { Task, TestPlan, SubjectName, ProgressStats, ChapterStats, SubjectStats, MicrotopicStats, StudySession } from '../types';
 import { Card } from './ui/StyledComponents';
@@ -412,21 +413,32 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
             }
         }
         
-        // Fix: Replaced reduce/map chain with flatMap for better readability and type safety.
-        const allSessionDates = completedTasks.flatMap(task => (task.sessions || []).map(session => session.date.split('T')[0]));
-        // Fix: Changed from spread syntax to Array.from() to fix a TypeScript type inference issue where Set spread results in unknown[].
-        const studyDays: string[] = Array.from(new Set(allSessionDates)).sort();
+        // Fix: Corrected flatMap usage to ensure proper type inference for allSessionDates.
+        const allSessionDates: string[] = completedTasks.flatMap(task => (task.sessions || []).map(session => session.date.split('T')[0]));
+        // Fix: Changed from Array.from() to spread syntax to correctly infer the type as string[] instead of unknown[].
+        const studyDays: string[] = [...new Set(allSessionDates)].sort();
         let consistencyStreak = 0;
         if (studyDays.length > 0) {
-            consistencyStreak = 1;
-            for (let i = studyDays.length - 1; i > 0; i--) {
-                const current = new Date(studyDays[i]);
-                const prev = new Date(studyDays[i - 1]);
-                if ((current.getTime() - prev.getTime()) / (1000 * 3600 * 24) === 1) {
-                    consistencyStreak++;
-                } else break;
+            const today = new Date();
+            const yesterday = new Date();
+            yesterday.setDate(today.getDate() - 1);
+            const todayStr = today.toISOString().split('T')[0];
+            const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+            if(studyDays.includes(todayStr) || studyDays.includes(yesterdayStr)) {
+                consistencyStreak = 1;
+                for (let i = studyDays.length - 1; i > 0; i--) {
+                    const current = new Date(studyDays[i]);
+                    const prev = new Date(studyDays[i - 1]);
+                    if ((current.getTime() - prev.getTime()) / (1000 * 3600 * 24) === 1) {
+                        consistencyStreak++;
+                    } else {
+                        break;
+                    }
+                }
             }
         }
+
 
         const practiceTasks = completedTasks.filter(t => t.taskType === 'Practice' && t.totalQuestions && t.totalQuestions > 0)
             .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());

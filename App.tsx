@@ -9,14 +9,15 @@ import Timeline from './components/Timeline';
 import Mentor from './components/Mentor';
 import SelfTracker from './components/SelfTracker';
 import Insights from './components/Insights';
-import { ClipboardListIcon, LayoutDashboardIcon, SettingsIcon, FileTextIcon, CalendarClockIcon, PlayIcon, PauseIcon, StopCircleIcon, MegaphoneIcon, XIcon, BrainCircuitIcon, ActivityIcon, HistoryIcon, AlertTriangleIcon } from './components/ui/Icons';
+import { ClipboardListIcon, LayoutDashboardIcon, SettingsIcon, FileTextIcon, CalendarClockIcon, PlayIcon, PauseIcon, StopCircleIcon, MegaphoneIcon, XIcon, BrainCircuitIcon, ActivityIcon, HistoryIcon, AlertTriangleIcon, MaximizeIcon, MinimizeIcon } from './components/ui/Icons';
 import { Task, ActiveTimer, StudySession, TestPlan, TopicPracticeAttempt, RevisionAttempt } from './types';
 import LiveBackground from './components/LiveBackground';
-import useLocalStorage from './hooks/useLocalStorage';
 import useStorageUsage from './hooks/useStorageUsage';
 import { generatePerformanceSummary, formatDuration, cn } from './lib/utils';
-import { Button, Modal, Input } from './components/ui/StyledComponents';
+import { Button, Modal, Input, Textarea } from './components/ui/StyledComponents';
 import { TimeEditor } from './components/ui/TimeEditor';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, setMiscItem, getMiscItem } from './services/db';
 
 
 // --- ADMIN NOTIFICATION CONFIG ---
@@ -111,7 +112,7 @@ const StorageWarningBanner: React.FC<{ usagePercentage: number }> = ({ usagePerc
         } else {
             setIsVisible(false);
         }
-    }, [isWarning, storageKey]);
+    }, [isWarning, storageKey, usagePercentage]);
 
     const handleDismiss = () => {
         window.sessionStorage.setItem(storageKey, 'true');
@@ -161,59 +162,167 @@ const StorageWarningBanner: React.FC<{ usagePercentage: number }> = ({ usagePerc
 };
 
 
-// --- Global Timer Bar ---
-const TimerBar: React.FC<{
+// --- Global Timer Components ---
+const CircularProgress: React.FC<{ progress: number; isUrgent: boolean; isOverTime: boolean }> = ({ progress, isUrgent, isOverTime }) => {
+    const radius = 52;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (progress / 100) * circumference;
+    
+    const colorClass = isOverTime ? 'text-red-500' : isUrgent ? 'text-yellow-500' : 'text-brand-amber-400';
+
+    return (
+        <svg className="w-32 h-32" viewBox="0 0 120 120">
+            <circle className="text-slate-800" strokeWidth="8" stroke="currentColor" fill="transparent" r={radius} cx="60" cy="60" />
+            <circle
+                className={cn(colorClass, "transition-all duration-500")}
+                strokeWidth="8"
+                strokeDasharray={circumference}
+                strokeDashoffset={offset}
+                strokeLinecap="round"
+                stroke="currentColor"
+                fill="transparent"
+                r={radius}
+                cx="60"
+                cy="60"
+                transform="rotate(-90 60 60)"
+            />
+        </svg>
+    );
+};
+
+const GlobalTimer: React.FC<{
     activeTimer: ActiveTimer | null;
     pauseTimer: () => void;
     resumeTimer: () => void;
     stopTimer: () => void;
 }> = ({ activeTimer, pauseTimer, resumeTimer, stopTimer }) => {
-    const [displayTime, setDisplayTime] = useState('00:00:00');
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);
+    const [isMinimized, setIsMinimized] = useState(true);
 
     useEffect(() => {
         let interval: ReturnType<typeof setInterval>;
         if (activeTimer && !activeTimer.isPaused) {
             interval = setInterval(() => {
                 const elapsed = activeTimer.elapsedTime + (Date.now() - activeTimer.startTime);
-                const totalSeconds = Math.floor(elapsed / 1000);
-                const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
-                const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
-                const seconds = String(totalSeconds % 60).padStart(2, '0');
-                setDisplayTime(`${hours}:${minutes}:${seconds}`);
+                setElapsedSeconds(Math.floor(elapsed / 1000));
             }, 1000);
-        } else if (activeTimer && activeTimer.isPaused) {
-            const totalSeconds = Math.floor(activeTimer.elapsedTime / 1000);
-            const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
-            const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
-            const seconds = String(totalSeconds % 60).padStart(2, '0');
-            setDisplayTime(`${hours}:${minutes}:${seconds}`);
+        } else if (activeTimer) {
+             setElapsedSeconds(Math.floor(activeTimer.elapsedTime / 1000));
         }
-
         return () => clearInterval(interval);
     }, [activeTimer]);
 
     if (!activeTimer) return null;
 
     const timerName = activeTimer.task?.name || activeTimer.test?.name || "Timer";
+    const { targetDuration } = activeTimer;
+
+    let timeRemaining = targetDuration ? targetDuration - elapsedSeconds : null;
+    let isOverTime = timeRemaining !== null && timeRemaining < 0;
+    let isUrgent = targetDuration ? !isOverTime && timeRemaining! <= targetDuration * 0.2 : false;
+    let progress = targetDuration ? Math.min(100, (elapsedSeconds / targetDuration) * 100) : 0;
+
+    const baseClasses = "fixed z-[60] bg-slate-900/80 backdrop-blur-xl border rounded-lg transition-all duration-300";
+    const dynamicClasses = targetDuration 
+        ? isOverTime 
+            ? "border-red-500/80 shadow-glow-amber-lg animate-pulseGlowEnergetic" 
+            : isUrgent 
+            ? "border-yellow-500/80 animate-pulseGlow" 
+            : "border-brand-amber-500/30 shadow-glow-amber"
+        : "border-brand-amber-500/30 shadow-glow-amber";
+
+    const timeColorClass = isOverTime ? "text-red-400" : isUrgent ? "text-yellow-400" : "text-brand-amber-400";
+    
+    const displayTime = formatDuration(elapsedSeconds).replace(/ /g, '');
+    const overtimeDisplay = isOverTime ? `+${formatDuration(Math.abs(timeRemaining!))}` : null;
+
+    if (isMinimized) {
+        return (
+            <div className={cn(baseClasses, dynamicClasses, "bottom-20 md:bottom-5 right-5 flex items-center justify-between gap-4 p-3 animate-fadeIn w-64")}>
+                <div className="flex-1 min-w-0">
+                    <p className={cn("font-display font-bold text-2xl tracking-wider", timeColorClass)}>
+                        {isOverTime ? overtimeDisplay : displayTime}
+                    </p>
+                    <p className="text-xs text-gray-300 truncate" title={timerName}>{timerName}</p>
+                </div>
+                <div className="flex flex-col items-center gap-1.5">
+                    <Button onClick={() => setIsMinimized(false)} size="sm" variant="ghost" className="p-2"><MaximizeIcon className="w-4 h-4" /></Button>
+                    {activeTimer.isPaused ? (
+                        <Button onClick={resumeTimer} size="sm" variant="secondary" aria-label="Resume Timer" className="p-2"><PlayIcon className="w-4 h-4" /></Button>
+                    ) : (
+                        <Button onClick={pauseTimer} size="sm" variant="secondary" aria-label="Pause Timer" className="p-2"><PauseIcon className="w-4 h-4" /></Button>
+                    )}
+                    <Button onClick={stopTimer} size="sm" variant="danger" aria-label="Stop Timer" className="p-2"><StopCircleIcon className="w-4 h-4" /></Button>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className="fixed bottom-20 md:bottom-5 right-5 z-[60] bg-slate-900/80 backdrop-blur-xl border border-brand-amber-500/30 rounded-lg shadow-glow-amber flex items-center justify-between gap-4 p-3 animate-fadeIn w-64">
-            <div className="flex-1 min-w-0">
-                <p className="font-display font-bold text-brand-amber-400 text-2xl tracking-wider">{displayTime}</p>
-                <p className="text-xs text-gray-300 truncate" title={timerName}>{timerName}</p>
+        <div className={cn(baseClasses, dynamicClasses, "bottom-5 right-5 p-4 animate-fadeIn w-80")}>
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="font-semibold text-gray-200 truncate pr-2" title={timerName}>{timerName}</h3>
+                <Button onClick={() => setIsMinimized(true)} size="sm" variant="ghost" className="p-2"><MinimizeIcon className="w-5 h-5" /></Button>
             </div>
-            <div className="flex flex-col items-center gap-1.5">
+
+            <div className="relative flex justify-center items-center my-4">
+                {targetDuration && <CircularProgress progress={progress} isUrgent={isUrgent} isOverTime={isOverTime} />}
+                <div className={cn("absolute font-display font-bold text-4xl tracking-wider", timeColorClass)}>
+                    {isOverTime ? overtimeDisplay : displayTime}
+                </div>
+            </div>
+
+            {targetDuration && (
+                <div className="text-center text-xs space-y-1 mb-4">
+                    <p>Target: <span className="font-semibold text-gray-300">{formatDuration(targetDuration)}</span></p>
+                    {isOverTime 
+                        ? <p className="font-bold text-red-400">OVER TIME</p> 
+                        : <p>Remaining: <span className="font-semibold text-gray-300">{formatDuration(timeRemaining!)}</span></p>
+                    }
+                </div>
+            )}
+
+            <div className="flex justify-center gap-3">
                 {activeTimer.isPaused ? (
-                    <Button onClick={resumeTimer} size="sm" variant="secondary" aria-label="Resume Timer" className="p-2"><PlayIcon className="w-4 h-4" /></Button>
+                    <Button onClick={resumeTimer} variant="secondary" className="flex-1"><PlayIcon className="w-5 h-5" /> Resume</Button>
                 ) : (
-                    <Button onClick={pauseTimer} size="sm" variant="secondary" aria-label="Pause Timer" className="p-2"><PauseIcon className="w-4 h-4" /></Button>
+                    <Button onClick={pauseTimer} variant="secondary" className="flex-1"><PauseIcon className="w-5 h-5" /> Pause</Button>
                 )}
-                <Button onClick={stopTimer} size="sm" variant="danger" aria-label="Stop Timer" className="p-2"><StopCircleIcon className="w-4 h-4" /></Button>
+                <Button onClick={stopTimer} variant="danger" className="flex-1"><StopCircleIcon className="w-5 h-5" /> Stop</Button>
             </div>
         </div>
     );
 };
 
+// --- Modals ---
+
+const TargetDurationModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onStart: (duration?: number) => void;
+    itemName: string;
+}> = ({ isOpen, onClose, onStart, itemName }) => {
+    const [duration, setDuration] = useState(3600); // Default to 1 hour
+
+    const handleStartWithTarget = () => {
+        onStart(duration);
+    };
+
+    const handleStartWithoutTarget = () => {
+        onStart(undefined);
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Set Target for: ${itemName}`}>
+            <p className="text-sm text-gray-300 mb-4">Set a target duration for your study session to stay on track. This will enable visual cues to help you manage time.</p>
+            <TimeEditor initialDuration={duration} onDurationChange={setDuration} label="Target Duration" />
+            <div className="flex justify-end gap-2 mt-6">
+                <Button type="button" variant="secondary" onClick={handleStartWithoutTarget}>Start without Target</Button>
+                <Button type="button" onClick={handleStartWithTarget}>Start with Target</Button>
+            </div>
+        </Modal>
+    );
+};
 
 const Header: React.FC = () => {
     return (
@@ -417,7 +526,7 @@ const CompletePracticeModal: React.FC<{
 const SpacedRevisionModal: React.FC<{
     task: Task | null;
     onClose: () => void;
-    onComplete: (revisionTask: Task, duration: number, difficulty: number) => void;
+    onComplete: (revisionTask: Task, duration: number, difficulty: number, notes: string) => void;
 }> = ({ task, onClose, onComplete }) => {
     const targetTimes: { [key: number]: number } = { 3: 15 * 60, 5: 10 * 60, 7: 5 * 60, 15: 5 * 60, 30: 5 * 60 };
     const targetDuration = task?.revisionDay ? targetTimes[task.revisionDay] : 0;
@@ -425,9 +534,9 @@ const SpacedRevisionModal: React.FC<{
     const [time, setTime] = useState(0);
     const [isActive, setIsActive] = useState(true);
     const [difficulty, setDifficulty] = useState(3);
+    const [notes, setNotes] = useState('');
 
     useEffect(() => {
-        // Fix: Changed NodeJS.Timeout to ReturnType<typeof setInterval> for browser compatibility.
         let interval: ReturnType<typeof setInterval> | null = null;
         if (isActive) {
             interval = setInterval(() => {
@@ -443,6 +552,7 @@ const SpacedRevisionModal: React.FC<{
         setTime(0);
         setIsActive(true);
         setDifficulty(3);
+        setNotes('');
     }, [task]);
 
     if (!task) return null;
@@ -462,12 +572,13 @@ const SpacedRevisionModal: React.FC<{
 
     const handleComplete = () => {
         setIsActive(false);
-        onComplete(task, time, difficulty);
+        onComplete(task, time, difficulty, notes);
     };
 
     return (
-        <Modal isOpen={!!task} onClose={onClose} title={`Grab It Completely: ${task.name}`} maxWidth="max-w-xl">
-             <div className={cn("relative bg-slate-900/80 backdrop-blur-2xl border-2 rounded-lg p-6 w-full my-8 transition-all duration-500", modalBorderClass)}>
+        <Modal isOpen={!!task} onClose={onClose} title={`Grab It Completely`} maxWidth="max-w-xl">
+             <div className={cn("relative bg-slate-900/80 backdrop-blur-2xl border-2 rounded-lg p-6 w-full my-4 transition-all duration-500", modalBorderClass)}>
+                <h3 className="font-semibold text-gray-200 text-center text-lg mb-4 truncate" title={task.name}>{task.name}</h3>
                 <div className="text-center">
                     <p className="font-display text-lg text-gray-400">Target Time: {formatDuration(targetDuration)}</p>
                     <p className="font-display font-bold text-7xl my-4 tracking-wider">{displayTime}</p>
@@ -475,7 +586,7 @@ const SpacedRevisionModal: React.FC<{
                     {isUrgent && <p className="text-yellow-400 font-bold text-lg animate-fadeIn">HURRY UP!</p>}
                 </div>
 
-                <div className="my-8">
+                <div className="my-6">
                     <label className="block mb-2 font-display text-lg text-center">How difficult did you feel instantly?</label>
                     <div className="flex items-center gap-4 my-4">
                         <span className="text-sm text-gray-400">Easy</span>
@@ -483,6 +594,25 @@ const SpacedRevisionModal: React.FC<{
                         <span className="text-sm text-gray-400">Hard</span>
                         <span className="font-bold text-cyan-400 text-2xl w-8 text-center">{difficulty}</span>
                     </div>
+                </div>
+
+                {task.notes && (
+                    <div className="my-6">
+                        <label className="block mb-2 font-display text-lg text-center">Notes from Previous Revisions</label>
+                        <div className="max-h-24 overflow-y-auto p-3 bg-black/30 rounded-md text-sm text-gray-300 whitespace-pre-wrap font-mono">
+                            {task.notes}
+                        </div>
+                    </div>
+                )}
+
+                <div className="my-6">
+                    <label className="block mb-2 font-display text-lg text-center">Add Notes for this Revision</label>
+                    <Textarea
+                        value={notes}
+                        onChange={e => setNotes(e.target.value)}
+                        placeholder="e.g., Found a tricky concept, need to review again..."
+                        rows={3}
+                    />
                 </div>
 
                 <div className="flex justify-center gap-4 mt-6">
@@ -496,69 +626,48 @@ const SpacedRevisionModal: React.FC<{
 
 
 const App: React.FC = () => {
-    const [tasks, setTasks] = useLocalStorage<Task[]>('tasks', []);
-    const [testPlans, setTestPlans] = useLocalStorage<TestPlan[]>('testPlans', []);
-    const [activeTimer, setActiveTimer] = useLocalStorage<ActiveTimer | null>('activeTimer', null);
+    const tasks = useLiveQuery(() => db.tasks.orderBy('date').toArray(), []);
+    const testPlans = useLiveQuery(() => db.testPlans.orderBy('date').toArray(), []);
+    const activeTimer = useLiveQuery(() => getMiscItem<ActiveTimer | null>('activeTimer', null), null);
+    const [targetScore, setTargetScore] = useState(680);
+
+    const [timerSetup, setTimerSetup] = useState<{ task?: Task; test?: TestPlan } | null>(null);
     const [taskToComplete, setTaskToComplete] = useState<Task | null>(null);
     const [taskToFinalize, setTaskToFinalize] = useState<{ task: Task; duration: number } | null>(null);
     const [sessionToConfirm, setSessionToConfirm] = useState<{ task: Task; duration: number } | null>(null);
     const [completedTestInfo, setCompletedTestInfo] = useState<{ test: TestPlan, duration: number } | null>(null);
-    const [targetScore, setTargetScore] = useLocalStorage<number>('targetScore', 680);
     const [revisingTask, setRevisingTask] = useState<Task | null>(null);
     const { usagePercentage, refreshUsage } = useStorageUsage();
-    const location = useLocation();
+    
+    useEffect(() => {
+        getMiscItem('targetScore', 680).then(setTargetScore);
+    }, []);
+
+    const handleSetTargetScore = (score: number) => {
+        setTargetScore(score);
+        setMiscItem('targetScore', score);
+    };
 
     useEffect(() => {
         refreshUsage();
     }, [tasks, testPlans, refreshUsage]);
 
     useEffect(() => {
-        // One-time data migrations for tasks
-        const runMigrations = () => {
-            setTasks(currentTasks => {
-                let needsUpdate = false;
-                const migratedTasks = currentTasks.map(t => {
-                    let task: Task = { ...t };
-                    
-                    // Fix: Cast task to 'any' to check for legacy 'microtopic' property for data migration.
-                    const oldTask = t as any;
-                    if (oldTask.microtopic && !t.microtopics) {
-                        needsUpdate = true;
-                        const { microtopic, ...rest } = oldTask;
-                        task = { ...rest, microtopics: [microtopic], sessions: t.sessions || [] };
+        const requestPersistence = async () => {
+            if (navigator.storage && navigator.storage.persist) {
+                try {
+                    const isPersisted = await navigator.storage.persisted();
+                    if (!isPersisted) {
+                        const persisted = await navigator.storage.persist();
+                        console.log(`Storage persistence requested: ${persisted}`);
                     }
-                    
-                    const taskWithDuration = t as Task & { duration?: number };
-                    if (taskWithDuration.duration !== undefined && !t.sessions) {
-                        needsUpdate = true;
-                        const { duration, ...rest } = taskWithDuration;
-                        task = {
-                            ...rest,
-                            sessions: duration > 0 ? [{ date: t.date, duration: duration }] : [],
-                        };
-                    } else if (!t.sessions) {
-                         needsUpdate = true;
-                         task.sessions = [];
-                    }
-
-                    if (task.taskType === ('Study' as any)) {
-                        needsUpdate = true;
-                        task.taskType = 'Lecture';
-                    }
-
-                    return task;
-                });
-                
-                if (needsUpdate) {
-                    console.log("Running data migrations for tasks...");
-                    return migratedTasks;
+                } catch (error) {
+                    console.error("Could not request persistent storage:", error);
                 }
-                return currentTasks;
-            });
+            }
         };
-        runMigrations();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); 
+        requestPersistence();
+    }, []);
     
     useEffect(() => {
         if (taskToFinalize) {
@@ -567,12 +676,12 @@ const App: React.FC = () => {
     }, [taskToFinalize]);
 
     // --- Timer Logic ---
-    const startTaskTimer = (task: Task) => {
+     const startTaskTimer = (task: Task) => {
         if (activeTimer) {
              alert("Another timer is already running. Please stop it before starting a new one.");
             return;
         }
-        setActiveTimer({ task, startTime: Date.now(), elapsedTime: 0, isPaused: false });
+        setTimerSetup({ task });
     };
 
     const startTestTimer = (test: TestPlan) => {
@@ -580,21 +689,40 @@ const App: React.FC = () => {
              alert("Another timer is already running. Please stop it before starting a new one.");
             return;
         }
-        setActiveTimer({ test, startTime: Date.now(), elapsedTime: 0, isPaused: false });
+        setTimerSetup({ test });
     };
 
-    const pauseTimer = () => {
-        setActiveTimer(prev => {
-            if (!prev || prev.isPaused) return prev;
-            return { ...prev, elapsedTime: prev.elapsedTime + (Date.now() - prev.startTime), isPaused: true };
-        });
+    const handleStartTimerWithDuration = (duration?: number) => {
+        if (!timerSetup) return;
+
+        const { task, test } = timerSetup;
+        
+        const newTimer: ActiveTimer = {
+            task: task,
+            test: test,
+            startTime: Date.now(),
+            elapsedTime: 0,
+            isPaused: false,
+            targetDuration: duration,
+        };
+        setMiscItem('activeTimer', newTimer);
+
+        setTimerSetup(null); // Close modal and reset state
     };
 
-    const resumeTimer = () => {
-        setActiveTimer(prev => {
-            if (!prev || !prev.isPaused) return prev;
-            return { ...prev, startTime: Date.now(), isPaused: false };
-        });
+
+    const pauseTimer = async () => {
+        const timer = await getMiscItem<ActiveTimer | null>('activeTimer', null);
+        if (!timer || timer.isPaused) return;
+        const newTimer = { ...timer, elapsedTime: timer.elapsedTime + (Date.now() - timer.startTime), isPaused: true };
+        setMiscItem('activeTimer', newTimer);
+    };
+
+    const resumeTimer = async () => {
+        const timer = await getMiscItem<ActiveTimer | null>('activeTimer', null);
+        if (!timer || !timer.isPaused) return;
+        const newTimer = { ...timer, startTime: Date.now(), isPaused: false };
+        setMiscItem('activeTimer', newTimer);
     };
 
     const stopTimer = () => {
@@ -616,7 +744,7 @@ const App: React.FC = () => {
             }
         }
         
-        setActiveTimer(null);
+        setMiscItem('activeTimer', null);
     };
 
     const handleConfirmSession = (task: Task, duration: number) => {
@@ -624,48 +752,71 @@ const App: React.FC = () => {
             date: new Date().toISOString(),
             duration: duration,
         };
-        setTasks(prevTasks =>
-            prevTasks.map(t =>
-                t.id === task.id
-                    ? { ...t, sessions: [...(t.sessions || []), newSession] }
-                    : t
-            )
-        );
+        db.tasks.update(task.id, {
+            sessions: [...(task.sessions || []), newSession]
+        });
         setSessionToConfirm(null);
     };
 
     // --- Task Completion Logic ---
-     const handleCompleteLecture = (difficulty: number, duration: number) => {
+    const handleCompleteLecture = (difficulty: number, duration: number) => {
         if (!taskToComplete) return;
 
         const originalTask = taskToComplete;
 
-        if (taskToFinalize) { // This is a new task from the TestPlanner timer
-            const performanceSummary = generatePerformanceSummary(difficulty, undefined, undefined, duration);
-            const finalTask: Task = {
-                ...taskToFinalize.task,
-                status: 'Completed',
-                difficulty,
-                notes: (taskToFinalize.task.notes || '') + performanceSummary,
-                sessions: [{ date: new Date().toISOString(), duration: duration }],
-            };
-            setTasks(prev => [...prev, finalTask].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
-        } else { // This is an existing task from the Planner
-            const performanceSummary = generatePerformanceSummary(difficulty, undefined, undefined, duration);
-            const updatedNotes = (taskToComplete.notes || '') + performanceSummary;
-            setTasks(prevTasks => prevTasks.map(t => t.id === taskToComplete.id ? { ...t, status: 'Completed', difficulty, notes: updatedNotes, sessions: [{ date: t.date, duration }] } : t));
-        }
+        db.transaction('rw', db.tasks, async () => {
+             if (taskToFinalize) { // New task from TestPlanner
+                const performanceSummary = generatePerformanceSummary(difficulty, undefined, undefined, duration);
+                const finalTask: Omit<Task, 'id'> = {
+                    ...taskToFinalize.task,
+                    id: undefined as any, // Dexie will auto-generate
+                    status: 'Completed',
+                    difficulty,
+                    notes: (taskToFinalize.task.notes || '') + performanceSummary,
+                    sessions: [{ date: new Date().toISOString(), duration }],
+                };
+                delete (finalTask as any).id;
+                const newTaskId = await db.tasks.add(finalTask as Task);
+                
+                if (originalTask.taskType === 'Lecture') {
+                    await createSpacedRevisionTasks(originalTask, newTaskId);
+                }
+
+            } else { // Existing task from Planner
+                const performanceSummary = generatePerformanceSummary(difficulty, undefined, undefined, duration);
+                const updatedNotes = (originalTask.notes || '') + performanceSummary;
+                
+                await db.tasks.update(originalTask.id, {
+                    status: 'Completed',
+                    difficulty,
+                    notes: updatedNotes,
+                    sessions: [{ date: originalTask.date, duration }]
+                });
+
+                if (originalTask.taskType === 'Lecture') {
+                     await createSpacedRevisionTasks(originalTask, originalTask.id);
+                }
+            }
+        });
+
+        setTaskToComplete(null);
+        setTaskToFinalize(null);
+    };
+
+    const createSpacedRevisionTasks = async (originalTask: Task, sourceTaskId: string | number) => {
+        const revisionDays = [3, 5, 7, 15, 30];
         
-        // Spaced Repetition Logic for Lectures
-        if (originalTask.taskType === 'Lecture') {
-            const revisionDays = [3, 5, 7, 15, 30];
-            const newRevisionTasks: Task[] = revisionDays.map(day => {
+        const existingRevisions = await db.tasks.where({ sourceLectureTaskId: sourceTaskId as string }).toArray();
+        const existingDays = new Set(existingRevisions.map(t => t.revisionDay));
+
+        const newRevisionTasks = revisionDays
+            .filter(day => !existingDays.has(day))
+            .map(day => {
                 const revisionDate = new Date();
                 revisionDate.setDate(revisionDate.getDate() + day);
-                
                 return {
                     id: crypto.randomUUID(),
-                    name: `Grab It: Day ${day} Revision`,
+                    name: `Day ${day} Spaced Revision for "${originalTask.name}"`,
                     subject: originalTask.subject,
                     chapter: originalTask.chapter,
                     microtopics: originalTask.microtopics,
@@ -674,46 +825,62 @@ const App: React.FC = () => {
                     status: 'Pending',
                     priority: 'High',
                     sessions: [],
-                    sourceLectureTaskId: originalTask.id,
+                    sourceLectureTaskId: sourceTaskId as string,
                     revisionDay: day,
                 };
             });
-            setTasks(prev => [...prev, ...newRevisionTasks].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+        
+        if (newRevisionTasks.length > 0) {
+            await db.tasks.bulkAdd(newRevisionTasks);
         }
-
-        setTaskToComplete(null);
-        setTaskToFinalize(null);
     };
 
-    const handleCompleteRevision = (revisionTask: Task, duration: number, difficulty: number) => {
-        setTasks(prevTasks => {
-            const tasksCopy = [...prevTasks];
-            
+    const handleCompleteRevision = (revisionTask: Task, duration: number, difficulty: number, notes: string) => {
+        db.transaction('rw', db.tasks, async () => {
             // Update original lecture task with revision history
-            const originalLectureTaskIndex = tasksCopy.findIndex(t => t.id === revisionTask.sourceLectureTaskId);
-            if (originalLectureTaskIndex !== -1) {
+            const originalLectureTask = await db.tasks.get(revisionTask.sourceLectureTaskId!);
+            if (originalLectureTask) {
                 const newAttempt: RevisionAttempt = {
                     revisionDay: revisionTask.revisionDay!,
                     date: new Date().toISOString(),
                     duration,
                     difficulty,
+                    notes: notes,
                 };
-                const originalTask = { ...tasksCopy[originalLectureTaskIndex] };
-                originalTask.revisionHistory = [...(originalTask.revisionHistory || []), newAttempt];
-                tasksCopy[originalLectureTaskIndex] = originalTask;
+                await db.tasks.update(originalLectureTask.id, {
+                    revisionHistory: [...(originalLectureTask.revisionHistory || []), newAttempt]
+                });
             }
-            
+
             // Update the revision task itself to be completed
-            const revisionTaskIndex = tasksCopy.findIndex(t => t.id === revisionTask.id);
-            if (revisionTaskIndex !== -1) {
-                const updatedRevisionTask = { ...tasksCopy[revisionTaskIndex] };
-                updatedRevisionTask.status = 'Completed';
-                updatedRevisionTask.sessions = [{ date: new Date().toISOString(), duration }];
-                updatedRevisionTask.difficulty = difficulty;
-                tasksCopy[revisionTaskIndex] = updatedRevisionTask;
+            const currentNotes = revisionTask.notes || '';
+            const newNotesEntry = notes.trim() ? `\n\n--- My Notes for Day ${revisionTask.revisionDay} ---\n${notes}` : '';
+            await db.tasks.update(revisionTask.id, {
+                status: 'Completed',
+                sessions: [{ date: new Date().toISOString(), duration }],
+                difficulty,
+                notes: currentNotes + newNotesEntry,
+            });
+
+            // Carry over notes to the next revision task
+            if (notes.trim() && revisionTask.revisionDay) {
+                const revisionDays = [3, 5, 7, 15, 30];
+                const currentDayIndex = revisionDays.indexOf(revisionTask.revisionDay);
+                if (currentDayIndex !== -1 && currentDayIndex < revisionDays.length - 1) {
+                    const nextRevisionDay = revisionDays[currentDayIndex + 1];
+                    const nextRevisionTask = await db.tasks
+                        .where({ sourceLectureTaskId: revisionTask.sourceLectureTaskId, revisionDay: nextRevisionDay })
+                        .first();
+
+                    if (nextRevisionTask) {
+                        const notesHeader = `\n\n--- Notes from Day ${revisionTask.revisionDay} Revision ---\n`;
+                        const newNotes = notesHeader + notes;
+                        await db.tasks.update(nextRevisionTask.id, {
+                            notes: (nextRevisionTask.notes || '') + newNotes
+                        });
+                    }
+                }
             }
-    
-            return tasksCopy;
         });
         setRevisingTask(null);
     };
@@ -723,8 +890,9 @@ const App: React.FC = () => {
 
         if (taskToFinalize) { // New task from TestPlanner timer
             const performanceSummary = generatePerformanceSummary(undefined, total, correct, duration, incorrectCount);
-             const finalTask: Task = {
+             const finalTask: Omit<Task, 'id'> = {
                 ...taskToFinalize.task,
+                id: undefined as any,
                 status: 'Completed',
                 totalQuestions: total,
                 correctAnswers: correct,
@@ -732,13 +900,14 @@ const App: React.FC = () => {
                 notes: (taskToFinalize.task.notes || '') + performanceSummary,
                 sessions: [{ date: new Date().toISOString(), duration: duration }],
             };
-            setTasks(prev => [...prev, finalTask].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+            delete (finalTask as any).id;
+            db.tasks.add(finalTask as Task);
 
             const testNameMatch = taskToFinalize.task.notes.match(/For upcoming test: "([^"]+)"/);
             if (testNameMatch) {
                 const testName = testNameMatch[1];
-                setTestPlans(prevTests => prevTests.map(test => {
-                    if (test.name === testName && test.status === 'Upcoming') {
+                 db.testPlans.where({ name: testName, status: 'Upcoming' }).first().then(test => {
+                    if (test) {
                         const updatedTopicStatus = test.topicStatus.map(topic => {
                             if (
                                 topic.subject === taskToFinalize.task.subject &&
@@ -759,15 +928,21 @@ const App: React.FC = () => {
                             }
                             return topic;
                         });
-                        return { ...test, topicStatus: updatedTopicStatus };
+                        db.testPlans.update(test.id, { topicStatus: updatedTopicStatus });
                     }
-                    return test;
-                }));
+                });
             }
         } else { // Existing task from Planner
             const performanceSummary = generatePerformanceSummary(undefined, total, correct, duration, incorrectCount);
             const updatedNotes = (taskToComplete.notes || '') + performanceSummary;
-            setTasks(prevTasks => prevTasks.map(t => t.id === taskToComplete.id ? { ...t, status: 'Completed', totalQuestions: total, correctAnswers: correct, incorrectAnswers: incorrectCount, notes: updatedNotes, sessions: [{ date: t.date, duration }] } : t));
+            db.tasks.update(taskToComplete.id, {
+                status: 'Completed',
+                totalQuestions: total,
+                correctAnswers: correct,
+                incorrectAnswers: incorrectCount,
+                notes: updatedNotes,
+                sessions: [{ date: taskToComplete.date, duration }]
+            });
         }
 
         setTaskToComplete(null);
@@ -785,6 +960,15 @@ const App: React.FC = () => {
         setTaskToFinalize(null);
     }
 
+    if (tasks === undefined || testPlans === undefined || activeTimer === undefined) {
+        return (
+            <div className="flex items-center justify-center min-h-screen text-gray-200 bg-slate-950">
+                <p>Loading database...</p>
+            </div>
+        );
+    }
+
+
     return (
         <div className="relative min-h-screen text-gray-200 font-sans bg-slate-950">
             <LiveBackground />
@@ -796,8 +980,6 @@ const App: React.FC = () => {
                 <Routes>
                     <Route path="/" element={
                         <Planner 
-                            tasks={tasks} 
-                            setTasks={setTasks} 
                             activeTimer={activeTimer}
                             startTimer={startTaskTimer}
                             onCompleteTask={setTaskToComplete}
@@ -807,9 +989,7 @@ const App: React.FC = () => {
                     <Route path="/test-planner" element={
                         <TestPlanner
                             tasks={tasks}
-                            setTasks={setTasks}
                             testPlans={testPlans}
-                            setTestPlans={setTestPlans}
                             activeTimer={activeTimer}
                             startPrepTimer={startTaskTimer}
                             startTestTimer={startTestTimer}
@@ -817,13 +997,13 @@ const App: React.FC = () => {
                             onAnalysisComplete={() => setCompletedTestInfo(null)}
                         />
                     } />
-                    <Route path="/timeline" element={<Timeline />} />
+                    <Route path="/timeline" element={<Timeline tasks={tasks} testPlans={testPlans} />} />
                     <Route path="/mentor" element={
                         <Mentor 
                             tasks={tasks} 
                             testPlans={testPlans} 
                             targetScore={targetScore} 
-                            setTargetScore={setTargetScore} 
+                            setTargetScore={handleSetTargetScore} 
                         />
                     } />
                     <Route path="/self-tracker" element={<SelfTracker tasks={tasks} testPlans={testPlans} />} />
@@ -832,9 +1012,16 @@ const App: React.FC = () => {
                     <Route path="/settings" element={<Settings />} />
                 </Routes>
             </main>
-            <TimerBar activeTimer={activeTimer} pauseTimer={pauseTimer} resumeTimer={resumeTimer} stopTimer={stopTimer} />
+            <GlobalTimer activeTimer={activeTimer} pauseTimer={pauseTimer} resumeTimer={resumeTimer} stopTimer={stopTimer} />
             <BottomNavBar />
             
+            <TargetDurationModal 
+                isOpen={!!timerSetup}
+                onClose={() => setTimerSetup(null)}
+                onStart={handleStartTimerWithDuration}
+                itemName={timerSetup?.task?.name || timerSetup?.test?.name || ''}
+            />
+
             <ConfirmSessionModal 
                 sessionInfo={sessionToConfirm}
                 onConfirm={handleConfirmSession}

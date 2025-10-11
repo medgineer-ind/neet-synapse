@@ -5,6 +5,7 @@ import { cn, calculateProgress, analyzeSyllabusForTest, formatDuration, calculat
 import { PlusIcon, Trash2Icon, BrainIcon, ClipboardCheckIcon, ClockIcon, RepeatIcon, TargetIcon, TrophyIcon, AtomIcon, FlaskConicalIcon, LeafIcon, DnaIcon, ChevronDownIcon, TrendingUpIcon } from './ui/Icons';
 import { Card, Button, Input, Modal } from './ui/StyledComponents';
 import { TimeEditor } from './ui/TimeEditor';
+import { db } from '../services/db';
 
 // --- New Test Planner Components ---
 
@@ -658,9 +659,7 @@ const ChapterPracticeModal: React.FC<{
 
 interface TestPlannerProps {
     tasks: Task[];
-    setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
     testPlans: TestPlan[];
-    setTestPlans: React.Dispatch<React.SetStateAction<TestPlan[]>>;
     activeTimer: ActiveTimer | null;
     startPrepTimer: (task: Task) => void;
     startTestTimer: (test: TestPlan) => void;
@@ -669,7 +668,7 @@ interface TestPlannerProps {
 }
 
 
-const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, setTasks, testPlans, setTestPlans, activeTimer, startPrepTimer, startTestTimer, completedTestInfo, onAnalysisComplete }) => {
+const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, testPlans, activeTimer, startPrepTimer, startTestTimer, completedTestInfo, onAnalysisComplete }) => {
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
     const [testToAnalyze, setTestToAnalyze] = useState<TestPlan | null>(null);
     const [viewingTest, setViewingTest] = useState<TestPlan | null>(null);
@@ -787,12 +786,12 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, setTasks, testPlans, s
 
     const addTest = (testData: Omit<TestPlan, 'id'|'status'>) => {
         const newTest: TestPlan = { ...testData, id: crypto.randomUUID(), status: 'Upcoming' };
-        setTestPlans(prev => [...prev, newTest].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+        db.testPlans.add(newTest);
     };
 
     const deleteTest = (id: string) => {
         if (window.confirm('Are you sure you want to delete this test plan?')) {
-            setTestPlans(testPlans.filter(t => t.id !== id));
+            db.testPlans.delete(id);
         }
     };
     
@@ -819,7 +818,7 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, setTasks, testPlans, s
         };
         const updatedTest = { ...testBeingCompleted, status: 'Completed' as const, analysis: analysisWithTime };
         
-        setTestPlans(prevPlans => prevPlans.map(t => t.id === id ? updatedTest : t));
+        db.testPlans.update(id, { status: 'Completed', analysis: analysisWithTime });
 
         setTestToAnalyze(null);
         onAnalysisComplete();
@@ -863,21 +862,15 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, setTasks, testPlans, s
     const handleConfirmChapterRevision = (difficulty: number) => {
         if (!chapterToRevise) return;
         const { test, subject, chapter } = chapterToRevise;
+        
+        const updatedTopicStatus = test.topicStatus.map(topic => {
+            if (topic.subject === subject && topic.chapter === chapter) {
+                return { ...topic, revisionDifficulty: difficulty };
+            }
+            return topic;
+        });
+        db.testPlans.update(test.id, { topicStatus: updatedTopicStatus });
 
-        setTestPlans(prevTests => 
-            prevTests.map(t => {
-                if (t.id === test.id) {
-                    const updatedTopicStatus = t.topicStatus.map(topic => {
-                        if (topic.subject === subject && topic.chapter === chapter) {
-                            return { ...topic, revisionDifficulty: difficulty };
-                        }
-                        return topic;
-                    });
-                    return { ...t, topicStatus: updatedTopicStatus };
-                }
-                return t;
-            })
-        );
         setChapterToRevise(null);
     };
 
@@ -885,31 +878,25 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, setTasks, testPlans, s
         if (!chapterToPractice) return;
         const { test, subject, chapter } = chapterToPractice;
 
-        setTestPlans(prevTests => 
-            prevTests.map(t => {
-                if (t.id === test.id) {
-                    const newAttempt: TopicPracticeAttempt = {
-                        id: crypto.randomUUID(),
-                        totalQuestions: total,
-                        correctAnswers: correct,
-                        incorrectAnswers: incorrect,
-                        duration: 0, // No timer for this action
-                    };
+        const newAttempt: TopicPracticeAttempt = {
+            id: crypto.randomUUID(),
+            totalQuestions: total,
+            correctAnswers: correct,
+            incorrectAnswers: incorrect,
+            duration: 0, // No timer for this action
+        };
 
-                    const updatedTopicStatus = t.topicStatus.map(topic => {
-                        if (topic.subject === subject && topic.chapter === chapter) {
-                            return { 
-                                ...topic, 
-                                practiceAttempts: [...topic.practiceAttempts, newAttempt] 
-                            };
-                        }
-                        return topic;
-                    });
-                    return { ...t, topicStatus: updatedTopicStatus };
-                }
-                return t;
-            })
-        );
+        const updatedTopicStatus = test.topicStatus.map(topic => {
+            if (topic.subject === subject && topic.chapter === chapter) {
+                return { 
+                    ...topic, 
+                    practiceAttempts: [...topic.practiceAttempts, newAttempt] 
+                };
+            }
+            return topic;
+        });
+        db.testPlans.update(test.id, { topicStatus: updatedTopicStatus });
+        
         setChapterToPractice(null);
     };
 

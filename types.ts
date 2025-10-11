@@ -1,6 +1,6 @@
 
 
-// Fix: Removed self-import of `SubjectName` and `TaskType` which conflicted with local declarations.
+// This file defines the core data structures and types used throughout the application.
 export type SubjectName = 'Physics' | 'Chemistry' | 'Botany' | 'Zoology';
 export type TaskType = 'Lecture' | 'Revision' | 'Practice' | 'SpacedRevision';
 export type TaskStatus = 'Pending' | 'Completed';
@@ -17,6 +17,7 @@ export interface RevisionAttempt {
   date: string; // ISO string
   duration: number; // in seconds
   difficulty: number; // 1-5
+  notes?: string;
 }
 
 
@@ -202,4 +203,5 @@ export interface ActiveTimer {
     startTime: number;
     elapsedTime: number; // Time in ms, accumulated during pauses
     isPaused: boolean;
+    targetDuration?: number; // in seconds
 }

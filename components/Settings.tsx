@@ -1,23 +1,25 @@
+
 import React, { useRef } from 'react';
-import useLocalStorage from '../hooks/useLocalStorage';
 import { Task, TestPlan } from '../types';
-import { ShareIcon } from './ui/Icons';
+import { ShareIcon, AlertTriangleIcon } from './ui/Icons';
 import { Card, Button } from './ui/StyledComponents';
+import { db } from '../services/db';
 
 const Settings: React.FC = () => {
-    const [tasks, setTasks] = useLocalStorage<Task[]>('tasks', []);
-    const [testPlans, setTestPlans] = useLocalStorage<TestPlan[]>('testPlans', []);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleReset = () => {
+    const handleReset = async () => {
         if (window.confirm('Are you sure you want to delete all your data (tasks and test plans)? This action cannot be undone.')) {
-            setTasks([]);
-            setTestPlans([]);
+            await db.tasks.clear();
+            await db.testPlans.clear();
             alert('All data has been reset.');
         }
     };
 
-    const handleExport = () => {
+    const handleExport = async () => {
+        const tasks = await db.tasks.toArray();
+        const testPlans = await db.testPlans.toArray();
+        
         const dataToExport = {
             tasks,
             testPlans,
@@ -42,24 +44,34 @@ const Settings: React.FC = () => {
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
                 const text = e.target?.result;
                 if (typeof text === 'string') {
                     const importedData = JSON.parse(text);
-                    // Basic validation for new format
-                    if (importedData && Array.isArray(importedData.tasks) && Array.isArray(importedData.testPlans)) {
+                    const isNewFormat = importedData && Array.isArray(importedData.tasks) && Array.isArray(importedData.testPlans);
+                    const isOldFormat = Array.isArray(importedData) && (importedData.length === 0 || 'id' in importedData[0]);
+
+                    if (isNewFormat) {
                         if (window.confirm(`This will overwrite your current data with ${importedData.tasks.length} tasks and ${importedData.testPlans.length} test plans. Continue?`)) {
-                            setTasks(importedData.tasks);
-                            setTestPlans(importedData.testPlans);
+                            
+                            await db.transaction('rw', db.tasks, db.testPlans, async () => {
+                                await db.tasks.clear();
+                                await db.testPlans.clear();
+                                await db.tasks.bulkAdd(importedData.tasks);
+                                await db.testPlans.bulkAdd(importedData.testPlans);
+                            });
                             alert('Data imported successfully!');
                         }
                     } 
-                    // Fallback for old format (just tasks array)
-                    else if (Array.isArray(importedData) && (importedData.length === 0 || 'id' in importedData[0])) {
+                    else if (isOldFormat) {
                         if (window.confirm(`This will overwrite your current data with ${importedData.length} tasks (legacy format). Continue?`)) {
-                            setTasks(importedData);
-                            setTestPlans([]); // Reset test plans if importing old format
+                            
+                            await db.transaction('rw', db.tasks, db.testPlans, async () => {
+                                await db.tasks.clear();
+                                await db.testPlans.clear();
+                                await db.tasks.bulkAdd(importedData);
+                            });
                             alert('Data imported successfully!');
                         }
                     }
@@ -115,15 +127,35 @@ const Settings: React.FC = () => {
                 </Button>
             </Card>
             
+             <Card className="mb-8 p-6 border-yellow-500/30">
+                <h2 className="font-display text-2xl font-semibold text-yellow-400 mb-4 flex items-center gap-3"><AlertTriangleIcon className="w-6 h-6"/>Data Safety & Backup</h2>
+                <div className="space-y-3 text-gray-300">
+                    <p>
+                        <strong className="text-white">Important:</strong> All your study data is stored <strong className="text-white">only on this device</strong> within this browser. It is not saved in the cloud.
+                    </p>
+                    <p>
+                        This means your data can be <strong className="text-yellow-300">permanently lost</strong> if you:
+                    </p>
+                    <ul className="list-disc list-inside pl-4 text-sm space-y-1">
+                        <li>Clear your browser's cache or site data.</li>
+                        <li>Your device is lost, stolen, or damaged.</li>
+                        <li><strong className="text-white">(Especially on iPhone/iPad)</strong> Your device automatically clears data for websites you haven't visited in a while.</li>
+                    </ul>
+                    <p className="font-semibold text-white pt-2 border-t border-white/10">
+                        To protect your progress, please export your data regularly. Think of it as your personal cloud backup.
+                    </p>
+                </div>
+            </Card>
+
             <Card className="mb-8 p-6">
                 <h2 className="font-display text-2xl font-semibold text-brand-amber-400 mb-2">Data Management</h2>
                 <p className="text-gray-400 mb-6">Backup your data or start fresh. Your backup now includes test plans.</p>
                 <div className="flex flex-col sm:flex-row gap-4">
-                    <Button onClick={handleExport} variant="secondary" disabled={tasks.length === 0 && testPlans.length === 0}>
-                        Export Data
+                    <Button onClick={handleExport} variant="secondary">
+                        Export Data (Create Backup)
                     </Button>
                     <Button onClick={handleImportClick} variant="secondary">
-                        Import Data
+                        Import Data (Restore Backup)
                     </Button>
                     <input
                         type="file"
