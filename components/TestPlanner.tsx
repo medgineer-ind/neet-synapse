@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { TestPlan, SubjectName, AnalyzedTopic, Task, TopicStatus, TestPlanAnalysis, TopicPracticeAttempt, ProgressStats, ActiveTimer, SubjectTestPerformance, ChapterStats, MicrotopicStats } from '../types';
 import { syllabus } from '../data/syllabus';
 import { cn, calculateProgress, analyzeSyllabusForTest, formatDuration, calculateOverallScore, getScoreColorClass } from '../lib/utils';
-import { PlusIcon, Trash2Icon, BrainIcon, ClipboardCheckIcon, ClockIcon, RepeatIcon, TargetIcon, TrophyIcon, AtomIcon, FlaskConicalIcon, LeafIcon, DnaIcon, ChevronDownIcon, TrendingUpIcon } from './ui/Icons';
+import { PlusIcon, Trash2Icon, BrainIcon, ClipboardCheckIcon, ClockIcon, RepeatIcon, TargetIcon, TrophyIcon, AtomIcon, FlaskConicalIcon, LeafIcon, DnaIcon, ChevronDownIcon, TrendingUpIcon, PencilIcon } from './ui/Icons';
 import { Card, Button, Input, Modal } from './ui/StyledComponents';
 import { TimeEditor } from './ui/TimeEditor';
 import { db } from '../services/db';
@@ -133,6 +133,108 @@ const CreateTestModal: React.FC<{ isOpen: boolean; onClose: () => void; onAddTes
                 <div className="flex justify-end gap-2 mt-6">
                     <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
                     <Button type="submit" variant="primary">Create Test</Button>
+                </div>
+            </form>
+        </Modal>
+    );
+};
+
+const EditTestModal: React.FC<{ 
+    isOpen: boolean; 
+    onClose: () => void; 
+    onUpdateTest: (test: TestPlan) => void; 
+    tasks: Task[]; 
+    test: TestPlan | null;
+}> = ({ isOpen, onClose, onUpdateTest, tasks, test }) => {
+    const [name, setName] = useState('');
+    const [date, setDate] = useState('');
+    const [totalQuestions, setTotalQuestions] = useState('');
+    const [selectedSyllabus, setSelectedSyllabus] = useState<TestPlan['syllabus']>({});
+
+    useEffect(() => {
+        if (test) {
+            setName(test.name);
+            setDate(test.date);
+            setTotalQuestions(String(test.totalQuestions || ''));
+            setSelectedSyllabus(test.syllabus || {});
+        }
+    }, [test]);
+
+    const progressStats = useMemo(() => calculateProgress(tasks), [tasks]);
+    const { weakTopics, averageTopics, strongTopics } = useMemo(() => analyzeSyllabusForTest(selectedSyllabus, progressStats), [selectedSyllabus, progressStats]);
+
+    const handleChapterToggle = (subject: SubjectName, chapter: string) => {
+        setSelectedSyllabus(prev => {
+            const newSyllabus = { ...prev };
+            const subjectChapters = newSyllabus[subject] || [];
+            if (subjectChapters.includes(chapter)) {
+                newSyllabus[subject] = subjectChapters.filter(c => c !== chapter);
+                if (newSyllabus[subject]?.length === 0) {
+                    delete newSyllabus[subject];
+                }
+            } else {
+                newSyllabus[subject] = [...subjectChapters, chapter];
+            }
+            return newSyllabus;
+        });
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!test || !name.trim() || Object.keys(selectedSyllabus).length === 0 || !totalQuestions) {
+            alert('Please provide a test name, total questions, and select at least one chapter.');
+            return;
+        }
+
+        onUpdateTest({
+            ...test,
+            name,
+            date,
+            totalQuestions: Number(totalQuestions),
+            syllabus: selectedSyllabus,
+        });
+        onClose();
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Edit Test Plan">
+            <form onSubmit={handleSubmit}>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div className="md:col-span-2">
+                        <Input type="text" placeholder="Test Name (e.g., Mock Test 1)" value={name} onChange={e => setName(e.target.value)} required />
+                    </div>
+                    <Input type="number" placeholder="Total Questions (e.g., 200)" value={totalQuestions} onChange={e => setTotalQuestions(e.target.value)} min="1" required />
+                    <div className="md:col-span-3">
+                        <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+                    </div>
+                </div>
+                
+                <h3 className="font-semibold text-brand-cyan-400 mb-2">Select Syllabus</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-h-60 overflow-y-auto p-2 bg-black/20 rounded-md">
+                    {(Object.keys(syllabus) as SubjectName[]).map(subject => (
+                        <div key={subject}>
+                            <h4 className="font-bold mb-2">{subject}</h4>
+                            <div className="space-y-1">
+                                {Object.keys(syllabus[subject]).map(chapter => (
+                                    <label key={chapter} className="flex items-center text-sm cursor-pointer">
+                                        <input type="checkbox"
+                                            className="mr-2 form-checkbox h-4 w-4 text-brand-cyan-500 bg-gray-800 border-gray-600 rounded focus:ring-brand-cyan-500 focus:ring-offset-0"
+                                            checked={selectedSyllabus[subject]?.includes(chapter) || false}
+                                            onChange={() => handleChapterToggle(subject, chapter)}
+                                        />
+                                        {chapter}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {Object.keys(selectedSyllabus).length > 0 && <div className="mt-4"><TopicAnalysis weakTopics={weakTopics} averageTopics={averageTopics} strongTopics={strongTopics} /></div>}
+                
+                <div className="flex justify-end gap-2 mt-6">
+                    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button type="submit" variant="primary">Save Changes</Button>
                 </div>
             </form>
         </Modal>
@@ -671,6 +773,7 @@ interface TestPlannerProps {
 const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, testPlans, activeTimer, startPrepTimer, startTestTimer, completedTestInfo, onAnalysisComplete }) => {
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
     const [testToAnalyze, setTestToAnalyze] = useState<TestPlan | null>(null);
+    const [testToEdit, setTestToEdit] = useState<TestPlan | null>(null);
     const [viewingTest, setViewingTest] = useState<TestPlan | null>(null);
     const [expandedTest, setExpandedTest] = useState<string | null>(null);
     const [expandedCompletedTest, setExpandedCompletedTest] = useState<string | null>(null);
@@ -787,6 +890,48 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, testPlans, activeTimer
     const addTest = (testData: Omit<TestPlan, 'id'|'status'>) => {
         const newTest: TestPlan = { ...testData, id: crypto.randomUUID(), status: 'Upcoming' };
         db.testPlans.add(newTest);
+    };
+
+    const handleUpdateTest = (updatedTestData: TestPlan) => {
+        const oldTest = testPlans.find(t => t.id === updatedTestData.id);
+        if (!oldTest) return;
+    
+        const newTopicStatus: TopicStatus[] = [];
+        const newTopicsSet = new Set<string>();
+    
+        (Object.keys(updatedTestData.syllabus) as SubjectName[]).forEach(subject => {
+            updatedTestData.syllabus[subject]?.forEach(chapter => {
+                syllabus[subject][chapter].forEach(microtopic => {
+                    const topicKey = `${subject}-${chapter}-${microtopic}`;
+                    if (!newTopicsSet.has(topicKey)) {
+                        newTopicsSet.add(topicKey);
+    
+                        const oldTopicData = oldTest.topicStatus.find(
+                            t => t.subject === subject && t.chapter === chapter && t.microtopic === microtopic
+                        );
+    
+                        if (oldTopicData) {
+                            newTopicStatus.push(oldTopicData);
+                        } else {
+                            newTopicStatus.push({
+                                subject,
+                                chapter,
+                                microtopic,
+                                practiceAttempts: [],
+                            });
+                        }
+                    }
+                });
+            });
+        });
+    
+        db.testPlans.update(updatedTestData.id, {
+            name: updatedTestData.name,
+            date: updatedTestData.date,
+            syllabus: updatedTestData.syllabus,
+            totalQuestions: updatedTestData.totalQuestions,
+            topicStatus: newTopicStatus,
+        });
     };
 
     const deleteTest = (id: string) => {
@@ -935,7 +1080,8 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, testPlans, activeTimer
                                             <Button onClick={() => setExpandedTest(expandedTest === test.id ? null : test.id)} variant="secondary" size="sm">
                                                 {expandedTest === test.id ? 'Hide Prep' : 'Start Prep'}
                                             </Button>
-                                            <button onClick={() => deleteTest(test.id)} className="p-1 text-gray-400 hover:text-red-400 transition-colors"><Trash2Icon className="w-4 h-4" /></button>
+                                            <button onClick={() => setTestToEdit(test)} className="p-1 text-gray-400 hover:text-brand-amber-400 transition-colors" title="Edit Test"><PencilIcon className="w-4 h-4" /></button>
+                                            <button onClick={() => deleteTest(test.id)} className="p-1 text-gray-400 hover:text-red-400 transition-colors" title="Delete Test"><Trash2Icon className="w-4 h-4" /></button>
                                         </div>
                                     </div>
                                 </div>
@@ -1095,6 +1241,13 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, testPlans, activeTimer
             </section>
             
             <CreateTestModal isOpen={isCreateModalOpen} onClose={() => setCreateModalOpen(false)} onAddTest={addTest} tasks={tasks} />
+            <EditTestModal
+                isOpen={!!testToEdit}
+                onClose={() => setTestToEdit(null)}
+                onUpdateTest={handleUpdateTest}
+                tasks={tasks}
+                test={testToEdit}
+            />
             <TestAnalysisModal 
                 test={testToAnalyze}
                 initialDuration={initialDurationForAnalysis}
