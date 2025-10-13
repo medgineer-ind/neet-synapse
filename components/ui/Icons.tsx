@@ -92,6 +92,14 @@ export const AtomIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1" /><path d="M20.2 20.2c2.04-2.03.02-5.07-1.42-6.51-1.45-1.45-4.48-3.47-6.5-1.43-2.03 2.03-.02 5.07 1.42 6.51 1.46 1.46 4.48 3.47 6.5 1.43z" /><path d="M3.8 3.8c-2.04 2.03-.02 5.07 1.42 6.51 1.45 1.45 4.48 3.47 6.5 1.43 2.03-2.03.02-5.07-1.42-6.51C8.84 3.77 5.82 1.75 3.8 3.8z" /><path d="M20.2 3.8c-2.03-2.03-5.07-.02-6.51 1.42-1.45 1.45-3.47 4.48-1.43 6.5 2.03 2.03 5.07.02 6.51-1.42 1.46-1.46 3.47-4.48 1.43-6.5z" /><path d="M3.8 20.2c2.03 2.03 5.07.02 6.51-1.42 1.45-1.45 3.47-4.48 1.43-6.5-2.03-2.03-5.07-.02-6.51 1.42-1.45 1.45-3.47 4.48-1.43 6.5z" /></svg>
 );
 
+export const BarChartIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="20" x2="12" y2="10"></line><line x1="18" y1="20" x2="18" y2="4"></line><line x1="6" y1="20" x2="6" y2="16"></line></svg>
+);
+
+export const BedIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4v16"/><path d="M2 10h20"/><path d="M6 10V4"/><path d="M6 18v-4"/><path d="M13 18v-4"/><path d="m6 6 12-2"/><path d="m6 16 12-2"/></svg>
+);
+
 export const FlaskConicalIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 2v7.31" /><path d="M14 9.31V2" /><path d="M6.6 15.13 4 22h16l-2.6-6.87A4.95 4.95 0 0 0 15.66 12H8.43a4.95 4.95 0 0 0-1.83 3.13Z" /></svg>
 );
@@ -101,7 +109,7 @@ export const LeafIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
 );
 
 export const DnaIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.01s.48-.93 1.34-1.34c.86-.41 2.03-.41 2.89 0 .86.41 1.34 1.34 1.34 1.34" /><path d="M14 4.01s.48.93 1.34 1.34c.86.41 2.03.41 2.89 0 .86-.41 1.34-1.34 1.34-1.34" /><path d="M8.03 9.01c-1 .5-1.97 1-1.97 2-.01.99.97 1.5 1.97 2" /><path d="M15.97 9.01c1 .5 1.97 1 1.97 2s-.97 1.5-1.97 2" /><path d="M12 12.01v4" /><path d="M4 20.01s.48.93 1.34 1.34c.86.41 2.03.41 2.89 0 .86-.41 1.34-1.34 1.34-1.34" /><path d="M14 10.01s.48-.93 1.34-1.34c.86-.41 2.03-.41 2.89 0 .86.41 1.34 1.34 1.34 1.34" /><path d="M4.5 8.01c0-1.5.01-3 1.5-3s1.5 1.5 1.5 3" /><path d="M17.5 16.01c0 1.5.01 3 1.5 3s1.5-1.5 1.5-3" /></svg>
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.01s.48-.93 1.34-1.34c.86-.41 2.03-.41 2.89 0 .86.41 1.34 1.34 1.34 1.34" /><path d="M14 4.01s.48.93 1.34 1.34c.86.41 2.03.41 2.89 0 .86-.41 1.34-1.34 1.34-1.34" /><path d="M8.03 9.01c-1 .5-1.97 1-1.97 2-.01.99.97 1.5 1.97 2" /><path d="M15.97 9.01c1 .5 1.97 1 1.97 2s-.97 1.5-1.97 2" /><path d="M12 12.01v4" /><path d="M4 20.01s.48.93 1.34 1.34c.86.41 2.03.41 2.89 0 .86-.41 1.34-1.34 1.34-1.34" /><path d="M14 10.01s.48-.93 1.34-1.34c.86.41 2.03-.41 2.89 0 .86.41 1.34 1.34 1.34 1.34" /><path d="M4.5 8.01c0-1.5.01-3 1.5-3s1.5 1.5 1.5 3" /><path d="M17.5 16.01c0 1.5.01 3 1.5 3s1.5-1.5 1.5-3" /></svg>
 );
 
 export const ChevronLeftIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
@@ -126,6 +134,10 @@ export const StickyNoteIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) =
 
 export const ShareIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+);
+
+export const CopyIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
 );
 
 export const CalendarClockIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
@@ -225,4 +237,24 @@ export const MaximizeIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => 
 
 export const MinimizeIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+);
+
+export const CoffeeIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 20.37V8.51A2.5 2.5 0 0 1 12.5 6h0A2.5 2.5 0 0 1 15 8.51v3.36"/><path d="M18 8.51h.01"/><path d="M6 8.51h.01"/><path d="M12 4.01V4"/><path d="M12 2v2"/><path d="M12 11.87v.01"/><path d="M10 20.37a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4.37a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4.37Z"/></svg>
+);
+
+export const UtensilsIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Z"/></svg>
+);
+
+export const DumbbellIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m6 2 4 4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/></svg>
+);
+
+export const PaintBrushIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18.2 3a.2.2 0 0 1 .2.2v3.3c0 .1-.1.2-.2.2H5.8c-.1 0-.2-.1-.2-.2V3.2c0-.1.1-.2.2-.2h12.4Z"/><path d="M11 7V3"/><path d="M13 7V3"/><path d="M16 12a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2Z"/><path d="M12 14v4"/><path d="M10 22h4"/></svg>
+);
+
+export const WrenchIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
 );

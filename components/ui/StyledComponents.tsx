@@ -11,12 +11,13 @@ export const Card: React.FC<{ children: React.ReactNode; className?: string }> =
     </div>
 );
 
-export const Button: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost', size?: 'default' | 'sm' }> = ({ children, className, variant = 'primary', size = 'default', ...props }) => {
+export const Button: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost', size?: 'default' | 'sm' | 'lg' }> = ({ children, className, variant = 'primary', size = 'default', ...props }) => {
     const baseClasses = "rounded-md font-display font-semibold tracking-wider uppercase transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-950";
     
     const sizeClasses = {
         default: "px-5 py-2.5 text-sm",
         sm: "px-3 py-1.5 text-xs",
+        lg: "px-8 py-4 text-lg",
     };
 
     const variantClasses = {

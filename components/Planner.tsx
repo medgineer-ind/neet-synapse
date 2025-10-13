@@ -117,7 +117,8 @@ const Calendar: React.FC<{
 const TaskForm: React.FC<{
     selectedDate: Date;
     onDateChange: (date: Date) => void;
-}> = ({ selectedDate, onDateChange }) => {
+    onClose: () => void;
+}> = ({ selectedDate, onDateChange, onClose }) => {
     const [name, setName] = useState<string>('');
     const [subject, setSubject] = useState<SubjectName>('Physics');
     const [chapter, setChapter] = useState<string>(Object.keys(syllabus.Physics)[0]);
@@ -186,10 +187,11 @@ const TaskForm: React.FC<{
         setName('');
         setNotes('');
         setMicrotopics([syllabus[subject][chapter][0]]);
+        onClose();
     };
 
     return (
-        <Card className="p-6 mb-8">
+        <Card className="p-6">
             <h2 className="font-display text-2xl font-bold text-brand-amber-400 mb-4 tracking-wide">Plan a New Task</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
@@ -248,8 +250,9 @@ const TaskForm: React.FC<{
                     <label className="block text-sm font-medium mb-1 font-display">Notes (Optional)</label>
                     <Textarea placeholder="Add any notes for this task..." value={notes} onChange={e => setNotes(e.target.value)} rows={2}/>
                 </div>
-                 <div className="flex justify-end">
-                    <Button type="submit" className="w-full md:w-auto mt-2"><PlusIcon className="w-5 h-5"/> Add Task</Button>
+                 <div className="flex justify-end gap-2 pt-2">
+                    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button type="submit"><PlusIcon className="w-5 h-5"/> Add Task</Button>
                 </div>
             </form>
         </Card>
@@ -677,7 +680,7 @@ const UpcomingTestDeadlines: React.FC = () => {
     }
 
     return (
-        <Card className="p-6 mb-8">
+        <Card className="p-6">
             <h2 className="font-display text-2xl font-bold text-brand-amber-400 mb-4 tracking-wide">Upcoming Test Deadlines</h2>
             <div className="space-y-4">
                 {upcomingTestsWithProgress.map(test => (
@@ -726,6 +729,8 @@ const Planner: React.FC<PlannerProps> = ({ activeTimer, startTimer, onCompleteTa
     const [taskToReschedule, setTaskToReschedule] = useState<Task | null>(null);
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [filters, setFilters] = useState<FilterState>({ subject: 'All', type: 'All', priority: 'All', status: 'All' });
+    const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
     
     const testPlans = useLiveQuery(() => db.testPlans.where('status').equals('Upcoming').toArray(), []);
 
@@ -770,47 +775,78 @@ const Planner: React.FC<PlannerProps> = ({ activeTimer, startTimer, onCompleteTa
         }).sort((a, b) => (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3));
     }, [tasksForSelectedDate, filters]);
 
+    const handleClearFilters = () => {
+        setFilters({ subject: 'All', type: 'All', priority: 'All', status: 'All' });
+        setIsFilterOpen(false);
+    };
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
-                <TaskForm selectedDate={selectedDate} onDateChange={setSelectedDate} />
+                {isTaskFormOpen ? (
+                    <TaskForm 
+                        selectedDate={selectedDate} 
+                        onDateChange={setSelectedDate} 
+                        onClose={() => setIsTaskFormOpen(false)}
+                    />
+                ) : (
+                    <Button
+                        onClick={() => setIsTaskFormOpen(true)}
+                        size="lg"
+                        className="w-full animate-fadeIn"
+                    >
+                        <PlusIcon className="w-5 h-5" /> Plan a New Task
+                    </Button>
+                )}
 
                 <UpcomingTestDeadlines />
 
                 <div>
-                    <h2 className="font-display text-2xl font-bold text-brand-amber-400 mb-4 tracking-wide">
-                        Tasks for {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                    </h2>
-                     <Card className="p-4 mb-4">
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 items-center">
-                            <div className="md:col-span-1 flex items-center gap-2 text-sm font-semibold font-display">
-                                <FilterIcon className="w-5 h-5 text-brand-amber-400" /> Filters
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="font-display text-2xl font-bold text-brand-amber-400 tracking-wide">
+                            Tasks for {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                        </h2>
+                        <Button
+                            onClick={() => setIsFilterOpen(prev => !prev)}
+                            variant="secondary"
+                            size="sm"
+                        >
+                            <FilterIcon className="w-4 h-4" /> Filter
+                        </Button>
+                    </div>
+                     
+                    {isFilterOpen && (
+                         <Card className="p-4 mb-4 animate-fadeIn">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
+                                <Select value={filters.subject} onChange={e => setFilters(f => ({ ...f, subject: e.target.value as any}))}>
+                                    <option value="All">All Subjects</option>
+                                    {(Object.keys(syllabus) as SubjectName[]).map(s => <option key={s} value={s}>{s}</option>)}
+                                </Select>
+                                <Select value={filters.type} onChange={e => setFilters(f => ({...f, type: e.target.value as any}))}>
+                                    <option value="All">All Types</option>
+                                    <option value="Lecture">Lecture</option>
+                                    <option value="Revision">Revision</option>
+                                    <option value="Practice">Practice</option>
+                                    <option value="SpacedRevision">Spaced Revision</option>
+                                </Select>
+                                 <Select value={filters.priority} onChange={e => setFilters(f => ({...f, priority: e.target.value as any}))}>
+                                    <option value="All">All Priorities</option>
+                                    <option value="High">High</option>
+                                    <option value="Medium">Medium</option>
+                                    <option value="Low">Low</option>
+                                </Select>
+                                <Select value={filters.status} onChange={e => setFilters(f => ({...f, status: e.target.value as any}))}>
+                                    <option value="All">All Statuses</option>
+                                    <option value="Pending">Pending</option>
+                                    <option value="Completed">Completed</option>
+                                </Select>
                             </div>
-                            <Select value={filters.subject} onChange={e => setFilters(f => ({ ...f, subject: e.target.value as any}))}>
-                                <option value="All">All Subjects</option>
-                                {(Object.keys(syllabus) as SubjectName[]).map(s => <option key={s} value={s}>{s}</option>)}
-                            </Select>
-                            <Select value={filters.type} onChange={e => setFilters(f => ({...f, type: e.target.value as any}))}>
-                                <option value="All">All Types</option>
-                                <option value="Lecture">Lecture</option>
-                                <option value="Revision">Revision</option>
-                                <option value="Practice">Practice</option>
-                                <option value="SpacedRevision">Spaced Revision</option>
-                            </Select>
-                             <Select value={filters.priority} onChange={e => setFilters(f => ({...f, priority: e.target.value as any}))}>
-                                <option value="All">All Priorities</option>
-                                <option value="High">High</option>
-                                <option value="Medium">Medium</option>
-                                <option value="Low">Low</option>
-                            </Select>
-                            <Select value={filters.status} onChange={e => setFilters(f => ({...f, status: e.target.value as any}))}>
-                                <option value="All">All Statuses</option>
-                                <option value="Pending">Pending</option>
-                                <option value="Completed">Completed</option>
-                            </Select>
-                        </div>
-                    </Card>
+                            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-white/10">
+                                <Button variant="secondary" size="sm" onClick={handleClearFilters}>Clear</Button>
+                                <Button size="sm" onClick={() => setIsFilterOpen(false)}>Apply</Button>
+                            </div>
+                        </Card>
+                    )}
 
                     {filteredAndSortedTasks.length === 0 ? (
                         <Card className="p-10 text-center text-gray-400 mt-4">

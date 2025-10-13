@@ -477,3 +477,13 @@ export function getScoreBgClass(score: number): string {
     if (score <= 79) return 'bg-yellow-500/10 hover:bg-yellow-500/20';
     return 'bg-green-500/10 hover:bg-green-500/20';
 }
+
+// Helper to get current ISO week string
+export function getCurrentWeekString() {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+    const week1 = new Date(date.getFullYear(), 0, 4);
+    const weekNumber = 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+    return `${date.getFullYear()}-W${String(weekNumber).padStart(2, '0')}`;
+}

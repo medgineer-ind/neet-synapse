@@ -1,11 +1,30 @@
-
-
 // This file defines the core data structures and types used throughout the application.
 export type SubjectName = 'Physics' | 'Chemistry' | 'Botany' | 'Zoology';
 export type TaskType = 'Lecture' | 'Revision' | 'Practice' | 'SpacedRevision';
 export type TaskStatus = 'Pending' | 'Completed';
 export type Theme = 'light' | 'dark';
 export type Priority = 'Low' | 'Medium' | 'High';
+
+export type BreakType = 'Short Break' | 'Meal' | 'Exercise' | 'Hobby' | 'Nap' | 'Other';
+
+export interface BreakSession {
+  id: string;
+  type: BreakType;
+  customType?: string;
+  date: string; // ISO string
+  duration: number; // in seconds
+  notes?: string;
+}
+
+export interface ActiveBreak {
+    type: BreakType;
+    customType?: string;
+    startTime: number;
+    elapsedTime: number; // Time in ms, accumulated during pauses
+    isPaused: boolean;
+    targetDuration?: number; // in seconds
+}
+
 
 export interface StudySession {
   date: string; // ISO string
@@ -18,6 +37,13 @@ export interface RevisionAttempt {
   duration: number; // in seconds
   difficulty: number; // 1-5
   notes?: string;
+}
+
+export interface DailyLog {
+  date: string; // YYYY-MM-DD
+  mood: number; // 1-5
+  energy: number; // 1-5
+  distractions: string; // Notes about distractions
 }
 
 

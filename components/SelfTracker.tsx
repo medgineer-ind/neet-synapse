@@ -1,4 +1,5 @@
 
+
 import React, { useMemo } from 'react';
 import { Task, TestPlan, SubjectName, ProgressStats, ChapterStats, SubjectStats, MicrotopicStats, StudySession } from '../types';
 import { Card } from './ui/StyledComponents';
@@ -413,10 +414,8 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
             }
         }
         
-        // Fix: Corrected flatMap usage to ensure proper type inference for allSessionDates.
-        const allSessionDates: string[] = completedTasks.flatMap(task => (task.sessions || []).map(session => session.date.split('T')[0]));
-        // Fix: Changed from Array.from() to spread syntax to correctly infer the type as string[] instead of unknown[].
-        const studyDays: string[] = [...new Set(allSessionDates)].sort();
+        const allSessionDates = completedTasks.flatMap(task => (task.sessions || []).map(session => session.date.split('T')[0]));
+        const studyDays = [...new Set(allSessionDates)].sort();
         let consistencyStreak = 0;
         if (studyDays.length > 0) {
             const today = new Date();

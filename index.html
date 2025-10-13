@@ -79,13 +79,29 @@
               pulseGlowEnergetic: {
                 '0%, 100%': { boxShadow: '0 0 15px rgba(251, 191, 36, 0.6), 0 0 5px rgba(251, 191, 36, 0.8)' },
                 '50%': { boxShadow: '0 0 25px rgba(251, 191, 36, 0.9), 0 0 10px rgba(251, 191, 36, 1)' },
-              }
+              },
+              rotate: {
+                '0%': { transform: 'rotate(0deg)' },
+                '100%': { transform: 'rotate(360deg)' },
+              },
+              pulseGlowAmber: {
+                '0%, 100%': { filter: 'drop-shadow(0 0 10px rgba(251, 191, 36, 0.5))' },
+                '50%': { filter: 'drop-shadow(0 0 20px rgba(251, 191, 36, 0.8))' },
+              },
+               pulseGlowOrange: {
+                '0%, 100%': { filter: 'drop-shadow(0 0 10px rgba(251, 146, 60, 0.5))' },
+                '50%': { filter: 'drop-shadow(0 0 20px rgba(251, 146, 60, 0.8))' },
+              },
             },
             animation: {
               fadeIn: 'fadeIn 0.5s ease-out forwards',
               slideIn: 'slideIn 0.5s ease-out forwards',
               pulseGlow: 'pulseGlow 2.5s infinite ease-in-out',
               pulseGlowEnergetic: 'pulseGlowEnergetic 3s infinite ease-in-out',
+              rotate: 'rotate 30s linear infinite',
+              'rotate-fast': 'rotate 15s linear infinite',
+              'pulse-glow-amber': 'pulseGlowAmber 3s infinite ease-in-out',
+              'pulse-glow-orange': 'pulseGlowOrange 3s infinite ease-in-out',
             },
           },
         },

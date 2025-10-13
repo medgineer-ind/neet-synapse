@@ -1,10 +1,14 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Task, ProgressStats, SubjectName, SubjectStats, AnalyzedTopic, TaskType, TestPlan, ChapterStats, MicrotopicStats, SubjectTestPerformance, Priority, StudySession, RevisionAttempt } from '../types';
-import { calculateProgress, analyzeTopicsForSubject, formatDuration, calculateStudyTimeStats, calculateOverallScore, getScoreColorClass, getScoreBgClass } from '../lib/utils';
+import { Task, ProgressStats, SubjectName, SubjectStats, AnalyzedTopic, TaskType, TestPlan, ChapterStats, MicrotopicStats, SubjectTestPerformance, Priority, StudySession, RevisionAttempt, BreakSession, BreakType, DailyLog } from '../types';
+import { calculateProgress, analyzeTopicsForSubject, formatDuration, calculateStudyTimeStats, calculateOverallScore, getScoreColorClass, getScoreBgClass, getCurrentWeekString } from '../lib/utils';
 import { cn } from '../lib/utils';
-import { ChevronDownIcon, AtomIcon, FlaskConicalIcon, LeafIcon, DnaIcon, BookOpenIcon, RepeatIcon, TargetIcon, CheckCircleIcon, TrophyIcon, ClockIcon, BrainCircuitIcon, AlertTriangleIcon } from './ui/Icons';
-import { Card, Select, Modal } from './ui/StyledComponents';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { ChevronDownIcon, AtomIcon, FlaskConicalIcon, LeafIcon, DnaIcon, BookOpenIcon, RepeatIcon, TargetIcon, CheckCircleIcon, TrophyIcon, ClockIcon, BrainCircuitIcon, AlertTriangleIcon, ShareIcon, CopyIcon } from './ui/Icons';
+import { Card, Select, Modal, Input, Button } from './ui/StyledComponents';
+import DailyReport from './DailyReport';
+import WeeklyReport from './WeeklyReport';
+import MonthlyReport from './MonthlyReport';
+import OverallReport from './OverallReport';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../services/db';
 
@@ -436,44 +440,107 @@ const ActivityTracker: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
     );
 }
 
-const StudyTimeAnalytics: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
+const StudyVsBreakTimeAnalytics: React.FC<{ tasks: Task[]; breakSessions: BreakSession[] }> = ({ tasks, breakSessions }) => {
     type Period = 'Daily' | 'Weekly' | 'Monthly';
     const [activePeriod, setActivePeriod] = useState<Period>('Daily');
 
-    const studyTimeStats = useMemo(() => calculateStudyTimeStats(tasks), [tasks]);
-
     const chartData = useMemo(() => {
-        let data;
+        const studyTimeStats = calculateStudyTimeStats(tasks);
+        
+        const dailyBreakTotals: { [date: string]: number } = {};
+        breakSessions.forEach(session => {
+            const dateStr = session.date.split('T')[0];
+            dailyBreakTotals[dateStr] = (dailyBreakTotals[dateStr] || 0) + session.duration;
+        });
+        const sortedDailyBreaks = Object.entries(dailyBreakTotals)
+            .map(([date, totalTime]) => ({ date, totalTime }))
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            
+        const getStartOfWeek = (date: Date): Date => {
+            const d = new Date(date);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            d.setHours(0, 0, 0, 0);
+            return new Date(d.setDate(diff));
+        };
+        
+        const weeklyBreakTotals: { [week: string]: number } = {};
+        sortedDailyBreaks.forEach(({ date, totalTime }) => {
+            const d = new Date(new Date(date).toLocaleString("en-US", { timeZone: "UTC" }));
+            const weekStart = getStartOfWeek(d);
+            const weekKey = weekStart.toISOString().split('T')[0];
+            weeklyBreakTotals[weekKey] = (weeklyBreakTotals[weekKey] || 0) + totalTime;
+        });
+        const sortedWeeklyBreaks = Object.entries(weeklyBreakTotals)
+            .map(([week, totalTime]) => ({ week, totalTime }))
+            .sort((a, b) => new Date(a.week).getTime() - new Date(b.week).getTime());
+
+        const monthlyBreakTotals: { [month: string]: number } = {};
+        sortedDailyBreaks.forEach(({ date, totalTime }) => {
+            const monthKey = date.substring(0, 7) + '-01';
+            monthlyBreakTotals[monthKey] = (monthlyBreakTotals[monthKey] || 0) + totalTime;
+        });
+        const sortedMonthlyBreaks = Object.entries(monthlyBreakTotals)
+            .map(([month, totalTime]) => ({ month, totalTime }))
+            .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
+
+        const breakTimeStats = {
+            daily: sortedDailyBreaks,
+            weekly: sortedWeeklyBreaks,
+            monthly: sortedMonthlyBreaks,
+        };
+        
+        let studyData, breakData;
+        let nameFn: (date: string) => string;
+        let keyName = 'date';
+
         if (activePeriod === 'Daily') {
-            data = studyTimeStats.daily.slice(-30);
-            return data.map(d => ({
-                name: new Date(new Date(d.date).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                'Study Time': d.totalTime
-            }));
+            studyData = studyTimeStats.daily.slice(-30);
+            breakData = breakTimeStats.daily.slice(-30);
+            nameFn = (date) => new Date(new Date(date).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        } else if (activePeriod === 'Weekly') {
+            studyData = studyTimeStats.weekly.slice(-12);
+            breakData = breakTimeStats.weekly.slice(-12);
+            keyName = 'week';
+            nameFn = (date) => `W/o ${new Date(new Date(date).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+        } else { // Monthly
+            studyData = studyTimeStats.monthly.slice(-12);
+            breakData = breakTimeStats.monthly.slice(-12);
+            keyName = 'month';
+            nameFn = (date) => new Date(new Date(date).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
         }
-        if (activePeriod === 'Weekly') {
-            data = studyTimeStats.weekly.slice(-12);
-            return data.map(d => ({
-                name: `W/o ${new Date(new Date(d.week).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
-                'Study Time': d.totalTime
-            }));
-        }
-        if (activePeriod === 'Monthly') {
-            data = studyTimeStats.monthly.slice(-12);
-            return data.map(d => ({
-                name: new Date(new Date(d.month).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }),
-                'Study Time': d.totalTime
-            }));
-        }
-        return [];
-    }, [activePeriod, studyTimeStats]);
+        
+        const combinedDataMap = new Map<string, { name: string; 'Study Time': number; 'Break Time': number }>();
+
+        studyData.forEach(d => {
+            const key = (d as any)[keyName];
+            combinedDataMap.set(key, { name: nameFn(key), 'Study Time': d.totalTime, 'Break Time': 0 });
+        });
+        
+        breakData.forEach(d => {
+            const key = (d as any)[keyName];
+            if (combinedDataMap.has(key)) {
+                combinedDataMap.get(key)!['Break Time'] = d.totalTime;
+            } else {
+                combinedDataMap.set(key, { name: nameFn(key), 'Study Time': 0, 'Break Time': d.totalTime });
+            }
+        });
+        
+        const sortedKeys = Array.from(combinedDataMap.keys()).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+        return sortedKeys.map(key => combinedDataMap.get(key)!);
+        
+    }, [activePeriod, tasks, breakSessions]);
 
     const CustomTooltip = ({ active, payload, label }: any) => {
         if (active && payload && payload.length) {
+            const studyTime = payload.find((p: any) => p.dataKey === 'Study Time')?.value || 0;
+            const breakTime = payload.find((p: any) => p.dataKey === 'Break Time')?.value || 0;
             return (
                 <div className="bg-slate-900/80 backdrop-blur-sm p-2 border border-brand-amber-500/30 rounded-md text-sm">
                     <p className="label text-gray-300">{`${label}`}</p>
-                    <p className="intro text-brand-amber-400">{`Total: ${formatDuration(payload[0].value)}`}</p>
+                    {studyTime > 0 && <p className="text-brand-amber-400">{`Study: ${formatDuration(studyTime)}`}</p>}
+                    {breakTime > 0 && <p className="text-cyan-400">{`Break: ${formatDuration(breakTime)}`}</p>}
+                    <p className="font-bold text-white mt-1">{`Total: ${formatDuration(studyTime + breakTime)}`}</p>
                 </div>
             );
         }
@@ -483,7 +550,7 @@ const StudyTimeAnalytics: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
     return (
         <Card className="p-6">
             <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4">
-                <h3 className="font-display text-lg font-semibold text-brand-amber-400">Study Time Analytics</h3>
+                <h3 className="font-display text-lg font-semibold text-brand-amber-400">Study vs. Break Time Analytics</h3>
                 <div className="flex items-center bg-black/20 rounded-lg p-1 self-start md:self-center">
                     {(['Daily', 'Weekly', 'Monthly'] as Period[]).map(period => (
                         <button key={period} onClick={() => setActivePeriod(period)} className={cn("px-3 py-1 text-sm rounded-md transition-colors font-display", activePeriod === period ? "bg-brand-amber-400 text-brand-amber-900 font-semibold" : "text-gray-300 hover:bg-white/10")}>
@@ -501,17 +568,23 @@ const StudyTimeAnalytics: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
                                 <stop offset="5%" stopColor="#FBBF24" stopOpacity={0.8}/>
                                 <stop offset="95%" stopColor="#D97706" stopOpacity={0.2}/>
                                 </linearGradient>
+                                <linearGradient id="breakBarGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.8}/>
+                                <stop offset="95%" stopColor="#0891b2" stopOpacity={0.4}/>
+                                </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
                             <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 12 }} />
                             <YAxis tickFormatter={(tick) => `${(tick / 3600).toFixed(1)}h`} tick={{ fill: '#9ca3af', fontSize: 12 }} />
                             <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(251, 191, 36, 0.1)'}}/>
-                            <Bar dataKey="Study Time" fill="url(#barGradient)" radius={[4, 4, 0, 0]} />
+                            <Legend />
+                            <Bar dataKey="Study Time" stackId="a" fill="url(#barGradient)" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="Break Time" stackId="a" fill="url(#breakBarGradient)" radius={[4, 4, 0, 0]} />
                         </BarChart>
                     </ResponsiveContainer>
                 ) : (
                     <div className="flex items-center justify-center h-full text-gray-400">
-                        <p>Log some study time to see your analytics.</p>
+                        <p>Log some study or break time to see your analytics.</p>
                     </div>
                 )}
             </div>
@@ -519,13 +592,6 @@ const StudyTimeAnalytics: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
     );
 };
 
-
-const SubjectStatsCard: React.FC<{ title: string; value: string; }> = ({ title, value }) => (
-    <div className="p-4 bg-slate-800/50 rounded-lg text-center">
-        <p className="font-display text-sm text-gray-400 uppercase tracking-wider">{title}</p>
-        <p className="font-display text-2xl font-bold text-brand-amber-400">{value}</p>
-    </div>
-);
 
 const DetailedStatsTable: React.FC<{ 
     subjectStats: SubjectStats, 
@@ -718,25 +784,190 @@ const TestPerformanceSummary: React.FC<{ completedTests: TestPlan[] }> = ({ comp
             </div>
         </Card>
     )
-}
+};
+
+const TimeAllocationChart: React.FC<{ studyTime: number, breakTime: number }> = ({ studyTime, breakTime }) => {
+    const data = [
+        { name: 'Study', value: studyTime },
+        { name: 'Breaks', value: breakTime },
+    ].filter(d => d.value > 0);
+
+    const COLORS = ['#F59E0B', '#06B6D4'];
+
+    if (data.length === 0) {
+        return <p className="text-center text-gray-400 py-8">No time logged for this period.</p>;
+    }
+
+    return (
+        <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                    <Pie
+                        data={data}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+                            const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                            const x = cx + radius * Math.cos(-midAngle * (Math.PI / 180));
+                            const y = cy + radius * Math.sin(-midAngle * (Math.PI / 180));
+                            return (
+                                <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize="14" fontWeight="bold">
+                                    {`${(percent * 100).toFixed(0)}%`}
+                                </text>
+                            );
+                        }}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        dataKey="value"
+                    >
+                        {data.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                    </Pie>
+                    <Tooltip
+                        contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '0.5rem' }}
+                        formatter={(value: number) => formatDuration(value)}
+                    />
+                    <Legend />
+                </PieChart>
+            </ResponsiveContainer>
+        </div>
+    );
+};
+
+const BreakdownOfBreaksChart: React.FC<{ breakSessions: BreakSession[] }> = ({ breakSessions }) => {
+    const breakData = useMemo(() => {
+        if (breakSessions.length === 0) return [];
+        const grouped = breakSessions.reduce((acc, session) => {
+            const type = session.type === 'Other' && session.customType ? session.customType : session.type;
+            if (!acc[type]) {
+                acc[type] = 0;
+            }
+            acc[type] += session.duration;
+            return acc;
+        }, {} as Record<string, number>);
+
+        return Object.entries(grouped).map(([name, time]) => ({ name, time }));
+    }, [breakSessions]);
+
+    if (breakData.length === 0) {
+        return <p className="text-center text-gray-400 py-8">No breaks logged for this period.</p>;
+    }
+    
+     const CustomTooltip = ({ active, payload, label }: any) => {
+        if (active && payload && payload.length) {
+            return (
+                <div className="bg-slate-900/80 backdrop-blur-sm p-2 border border-cyan-500/30 rounded-md text-sm">
+                    <p className="label text-gray-300">{`${label}`}</p>
+                    <p className="intro text-cyan-400">{`Total: ${formatDuration(payload[0].value)}`}</p>
+                </div>
+            );
+        }
+        return null;
+    };
+
+    return (
+        <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={breakData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                    <defs>
+                        <linearGradient id="breakBarGradient" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#0891b2" stopOpacity={0.4}/>
+                        </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
+                    <XAxis type="number" tickFormatter={(tick) => `${(tick / 3600).toFixed(1)}h`} tick={{ fill: '#9ca3af', fontSize: 12 }} />
+                    <YAxis type="category" dataKey="name" width={80} tick={{ fill: '#9ca3af', fontSize: 12 }} />
+                    <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(34, 211, 238, 0.1)'}}/>
+                    <Bar dataKey="time" fill="url(#breakBarGradient)" radius={[0, 4, 4, 0]} />
+                </BarChart>
+            </ResponsiveContainer>
+        </div>
+    );
+};
+
+
+const DailyLogCard: React.FC<{
+    onSave: (data: Omit<DailyLog, 'date'>) => void;
+}> = ({ onSave }) => {
+    const [mood, setMood] = useState(3);
+    const [energy, setEnergy] = useState(3);
+    const [distractions, setDistractions] = useState('');
+    const [isSaved, setIsSaved] = useState(false);
+    
+    const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+    const dailyLog = useLiveQuery(() => db.dailyLogs.get(todayStr), [todayStr]);
+
+    useEffect(() => {
+        if (dailyLog) {
+            setMood(dailyLog.mood);
+            setEnergy(dailyLog.energy);
+            setDistractions(dailyLog.distractions);
+        }
+    }, [dailyLog]);
+    
+    const moodEmoji = ['😞', '😕', '😐', '🙂', '😄'];
+    const energyEmoji = ['🪫', '🔋', '⚡️', '🚀', '🔥'];
+
+    const handleSave = () => {
+        onSave({ mood, energy, distractions });
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 2000);
+    };
+
+    return (
+        <div>
+            <h2 className="font-display text-lg font-semibold text-brand-amber-400 mb-4">Daily Log</h2>
+            <div className="space-y-4">
+                 <div>
+                    <label className="block text-sm font-medium mb-2 font-display">Mood {moodEmoji[mood-1]}</label>
+                    <input type="range" min="1" max="5" value={mood} onChange={e => setMood(Number(e.target.value))} className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer range-lg accent-brand-amber-500" />
+                </div>
+                 <div>
+                    <label className="block text-sm font-medium mb-2 font-display">Energy Level {energyEmoji[energy-1]}</label>
+                    <input type="range" min="1" max="5" value={energy} onChange={e => setEnergy(Number(e.target.value))} className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer range-lg accent-brand-amber-500" />
+                </div>
+                <div>
+                     <label className="block text-sm font-medium mb-1 font-display">Distractions / Notes</label>
+                    <Input type="text" value={distractions} onChange={e => setDistractions(e.target.value)} placeholder="e.g., Social media, family talk..." />
+                </div>
+                <Button onClick={handleSave} variant="secondary" className="w-full">
+                    {isSaved ? 'Log Saved!' : 'Save Daily Log'}
+                </Button>
+            </div>
+        </div>
+    );
+};
 
 const Dashboard: React.FC = () => {
     const tasks = useLiveQuery(() => db.tasks.toArray(), []);
     const testPlans = useLiveQuery(() => db.testPlans.toArray(), []);
+    const breakSessions = useLiveQuery(() => db.breakSessions.toArray(), []);
     const [stats, setStats] = useState<ProgressStats | null>(null);
 
     const [activeTab, setActiveTab] = useState<SubjectName>('Physics');
     const [historyModalTopic, setHistoryModalTopic] = useState<{ subject: SubjectName; chapter: string; microtopic: string; } | null>(null);
-    
+    const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'all'>('today');
+
+    const [reportType, setReportType] = useState<'Daily' | 'Weekly' | 'Monthly' | 'Overall'>('Daily');
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
+    const [reportWeek, setReportWeek] = useState(getCurrentWeekString());
+    const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7));
+
+
     useEffect(() => {
         if (tasks) {
-            // Set timeout to allow the UI to render a loading state before this blocking calculation starts
             setTimeout(() => {
                 const calculatedStats = calculateProgress(tasks);
                 setStats(calculatedStats);
             }, 10);
         }
     }, [tasks]);
+
+    const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
 
     const completedTests = useMemo(() => testPlans?.filter(t => t.status === 'Completed' && t.analysis) || [], [testPlans]);
 
@@ -761,8 +992,71 @@ const Dashboard: React.FC = () => {
     const handleMicrotopicClick = (subject: SubjectName, chapter: string, microtopic: string) => {
         setHistoryModalTopic({ subject, chapter, microtopic });
     };
+
+    const handleSaveLog = async (data: Omit<DailyLog, 'date'>) => {
+        await db.dailyLogs.put({ date: todayStr, ...data });
+    };
     
-    if (tasks === undefined || testPlans === undefined || stats === null) {
+    const getStartDate = (period: 'today' | 'week' | 'month' | 'all'): Date | null => {
+        const now = new Date();
+        if (period === 'all') return null;
+
+        const start = new Date(now);
+        start.setHours(0, 0, 0, 0);
+
+        if (period === 'today') {
+            return start;
+        }
+        if (period === 'week') {
+            const day = start.getDay();
+            const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+            return new Date(start.setDate(diff));
+        }
+        if (period === 'month') {
+            return new Date(start.getFullYear(), start.getMonth(), 1);
+        }
+        return null;
+    };
+    
+    const studyTimeForPeriod = useMemo(() => {
+        const startDate = getStartDate(period);
+        if (!startDate) return stats?.totalTimeStudied || 0;
+        let totalDuration = 0;
+        (tasks || []).forEach(task => {
+            (task.sessions || []).forEach(session => {
+                if (new Date(session.date) >= startDate) {
+                    totalDuration += session.duration;
+                }
+            });
+        });
+        return totalDuration;
+    }, [tasks, period, stats]);
+
+    const filteredBreakSessions = useMemo(() => {
+        const startDate = getStartDate(period);
+        if (!startDate) return breakSessions || [];
+        return (breakSessions || []).filter(session => new Date(session.date) >= startDate);
+    }, [breakSessions, period]);
+
+    const totalBreakTimeForPeriod = useMemo(() => filteredBreakSessions.reduce((sum, s) => sum + s.duration, 0), [filteredBreakSessions]);
+    
+    const openReportModal = () => {
+        if (reportType === 'Daily' && !reportDate) {
+            alert('Please select a date.');
+            return;
+        }
+        if (reportType === 'Weekly' && !reportWeek) {
+            alert('Please select a week.');
+            return;
+        }
+        if (reportType === 'Monthly' && !reportMonth) {
+            alert('Please select a month.');
+            return;
+        }
+        setIsReportModalOpen(true);
+    };
+
+    if (tasks === undefined || testPlans === undefined || stats === null || breakSessions === undefined) {
         return (
             <div className="space-y-8">
                  <h1 className="font-display text-4xl font-bold text-brand-amber-400 tracking-wide">Dashboard</h1>
@@ -780,6 +1074,48 @@ const Dashboard: React.FC = () => {
             <h1 className="font-display text-4xl font-bold text-brand-amber-400 tracking-wide">Dashboard</h1>
             
             <CountdownTimer />
+            
+            <Card className="p-6">
+                <DailyLogCard onSave={handleSaveLog} />
+                <div className="border-t border-white/10 mt-6 pt-4">
+                     <label className="block text-sm font-medium mb-2 font-display">Generate Report</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                         <Select value={reportType} onChange={e => setReportType(e.target.value as any)}>
+                            <option value="Daily">Daily</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="Monthly">Monthly</option>
+                            <option value="Overall">Overall</option>
+                        </Select>
+                        <div className="sm:col-span-2 flex gap-2">
+                             {reportType === 'Daily' && (
+                                <Input 
+                                    type="date" 
+                                    value={reportDate} 
+                                    onChange={e => setReportDate(e.target.value)} 
+                                    className="flex-grow"
+                                />
+                            )}
+                            {reportType === 'Weekly' && (
+                                <Input 
+                                    type="week" 
+                                    value={reportWeek}
+                                    onChange={e => setReportWeek(e.target.value)}
+                                    className="flex-grow"
+                                />
+                            )}
+                            {reportType === 'Monthly' && (
+                                <Input 
+                                    type="month"
+                                    value={reportMonth}
+                                    onChange={e => setReportMonth(e.target.value)}
+                                    className="flex-grow"
+                                />
+                            )}
+                            <Button onClick={openReportModal} className={cn(reportType === 'Overall' && 'flex-grow')}>Generate</Button>
+                        </div>
+                    </div>
+                </div>
+            </Card>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <OverallProgressSummary stats={stats} />
@@ -787,9 +1123,32 @@ const Dashboard: React.FC = () => {
 
             <TestPerformanceSummary completedTests={completedTests} />
 
-            <ActivityTracker tasks={tasks} />
+            <Card className="p-6">
+                <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4">
+                    <h2 className="font-display text-lg font-semibold text-brand-amber-400">Time Analysis</h2>
+                    <div className="flex items-center bg-black/20 rounded-lg p-1 self-start md:self-center">
+                        {(['today', 'week', 'month', 'all'] as const).map(p => (
+                            <button key={p} onClick={() => setPeriod(p)} className={cn("px-3 py-1 text-sm rounded-md transition-colors font-display capitalize", period === p ? "bg-brand-amber-400 text-brand-amber-900 font-semibold" : "text-gray-300 hover:bg-white/10")}>
+                                {p === 'all' ? 'All Time' : `This ${p}`}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div>
+                        <h3 className="font-semibold text-center mb-2">Study vs. Break Allocation</h3>
+                        <TimeAllocationChart studyTime={studyTimeForPeriod} breakTime={totalBreakTimeForPeriod} />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-center mb-2">Breakdown of Breaks</h3>
+                        <BreakdownOfBreaksChart breakSessions={filteredBreakSessions} />
+                    </div>
+                </div>
+            </Card>
             
-            <StudyTimeAnalytics tasks={tasks} />
+            <StudyVsBreakTimeAnalytics tasks={tasks} breakSessions={breakSessions} />
+
+            <ActivityTracker tasks={tasks} />
             
             <Card>
                 <div className="border-b border-white/10">
@@ -830,8 +1189,50 @@ const Dashboard: React.FC = () => {
                 tasks={tasks}
                 topic={historyModalTopic}
             />
+            
+            {isReportModalOpen && reportType === 'Daily' && (
+                <DailyReport
+                    date={new Date(new Date(reportDate).toLocaleString("en-US", { timeZone: "UTC" }))}
+                    allTasks={tasks}
+                    allTestPlans={testPlans}
+                    allBreakSessions={breakSessions}
+                    onClose={() => setIsReportModalOpen(false)}
+                />
+            )}
+            {isReportModalOpen && reportType === 'Weekly' && reportWeek && (
+                <WeeklyReport
+                    week={reportWeek}
+                    allTasks={tasks}
+                    allTestPlans={testPlans}
+                    allBreakSessions={breakSessions}
+                    onClose={() => setIsReportModalOpen(false)}
+                />
+            )}
+            {isReportModalOpen && reportType === 'Monthly' && reportMonth && (
+                <MonthlyReport
+                    month={reportMonth}
+                    allTasks={tasks}
+                    allTestPlans={testPlans}
+                    allBreakSessions={breakSessions}
+                    onClose={() => setIsReportModalOpen(false)}
+                />
+            )}
+            {isReportModalOpen && reportType === 'Overall' && (
+                <OverallReport
+                    allTasks={tasks}
+                    allTestPlans={testPlans}
+                    allBreakSessions={breakSessions}
+                    onClose={() => setIsReportModalOpen(false)}
+                />
+            )}
         </div>
     );
 };
 
+const SubjectStatsCard: React.FC<{ title: string; value: string; }> = ({ title, value }) => (
+    <div className="p-4 bg-slate-800/50 rounded-lg text-center">
+        <p className="font-display text-sm text-gray-400 uppercase tracking-wider">{title}</p>
+        <p className="font-display text-2xl font-bold text-brand-amber-400">{value}</p>
+    </div>
+);
 export default Dashboard;

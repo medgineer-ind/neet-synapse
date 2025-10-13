@@ -9,15 +9,19 @@ import Timeline from './components/Timeline';
 import Mentor from './components/Mentor';
 import SelfTracker from './components/SelfTracker';
 import Insights from './components/Insights';
-import { ClipboardListIcon, LayoutDashboardIcon, SettingsIcon, FileTextIcon, CalendarClockIcon, PlayIcon, PauseIcon, StopCircleIcon, MegaphoneIcon, XIcon, BrainCircuitIcon, ActivityIcon, HistoryIcon, AlertTriangleIcon, MaximizeIcon, MinimizeIcon } from './components/ui/Icons';
-import { Task, ActiveTimer, StudySession, TestPlan, TopicPracticeAttempt, RevisionAttempt } from './types';
+import { ClipboardListIcon, LayoutDashboardIcon, SettingsIcon, FileTextIcon, CalendarClockIcon, PlayIcon, PauseIcon, StopCircleIcon, MegaphoneIcon, XIcon, BrainCircuitIcon, ActivityIcon, HistoryIcon, AlertTriangleIcon, MaximizeIcon, MinimizeIcon, CoffeeIcon, UtensilsIcon, DumbbellIcon, PaintBrushIcon, BedIcon, PlusIcon, BarChartIcon, WrenchIcon } from './components/ui/Icons';
+import { Task, ActiveTimer, StudySession, TestPlan, TopicPracticeAttempt, RevisionAttempt, ActiveBreak, BreakType, BreakSession } from './types';
 import LiveBackground from './components/LiveBackground';
 import useStorageUsage from './hooks/useStorageUsage';
-import { generatePerformanceSummary, formatDuration, cn } from './lib/utils';
-import { Button, Modal, Input, Textarea } from './components/ui/StyledComponents';
+import { generatePerformanceSummary, formatDuration, cn, getCurrentWeekString } from './lib/utils';
+import { Button, Modal, Input, Textarea, Select } from './components/ui/StyledComponents';
 import { TimeEditor } from './components/ui/TimeEditor';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, setMiscItem, getMiscItem } from './services/db';
+import DailyReport from './components/DailyReport';
+import WeeklyReport from './components/WeeklyReport';
+import MonthlyReport from './components/MonthlyReport';
+import OverallReport from './components/OverallReport';
 
 
 // --- ADMIN NOTIFICATION CONFIG ---
@@ -163,30 +167,76 @@ const StorageWarningBanner: React.FC<{ usagePercentage: number }> = ({ usagePerc
 
 
 // --- Global Timer Components ---
-const CircularProgress: React.FC<{ progress: number; isUrgent: boolean; isOverTime: boolean }> = ({ progress, isUrgent, isOverTime }) => {
-    const radius = 52;
+const CircularProgress: React.FC<{ progress: number; isUrgent: boolean; isOverTime: boolean; className?: string; color?: 'amber' | 'orange' }> = ({ progress, isUrgent, isOverTime, className, color = 'amber' }) => {
+    const radius = 80;
     const circumference = 2 * Math.PI * radius;
     const offset = circumference - (progress / 100) * circumference;
     
-    const colorClass = isOverTime ? 'text-red-500' : isUrgent ? 'text-yellow-500' : 'text-brand-amber-400';
+    const colorClasses = {
+        amber: {
+            main: 'text-brand-amber-400',
+            glow: 'animate-pulse-glow-amber',
+        },
+        orange: {
+            main: 'text-brand-orange-400',
+            glow: 'animate-pulse-glow-orange',
+        },
+    };
+    
+    const progressColorClass = isOverTime ? 'text-red-500' : isUrgent ? 'text-yellow-500' : colorClasses[color].main;
 
     return (
-        <svg className="w-32 h-32" viewBox="0 0 120 120">
-            <circle className="text-slate-800" strokeWidth="8" stroke="currentColor" fill="transparent" r={radius} cx="60" cy="60" />
-            <circle
-                className={cn(colorClass, "transition-all duration-500")}
-                strokeWidth="8"
-                strokeDasharray={circumference}
-                strokeDashoffset={offset}
-                strokeLinecap="round"
-                stroke="currentColor"
-                fill="transparent"
-                r={radius}
-                cx="60"
-                cy="60"
-                transform="rotate(-90 60 60)"
-            />
-        </svg>
+        <div className={cn("relative", className)}>
+            <svg className="w-full h-full" viewBox="0 0 200 200">
+                <defs>
+                    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+                        <stop offset="60%" stopColor={isOverTime ? 'rgba(239, 68, 68, 0.1)' : isUrgent ? 'rgba(234, 179, 8, 0.1)' : color === 'amber' ? 'rgba(251, 191, 36, 0.1)' : 'rgba(251, 146, 60, 0.1)'} />
+                        <stop offset="100%" stopColor="transparent" />
+                    </radialGradient>
+                    <filter id="glow-filter">
+                        <feGaussianBlur stdDeviation="5" result="coloredBlur" />
+                        <feMerge>
+                            <feMergeNode in="coloredBlur" />
+                            <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                    </filter>
+                </defs>
+
+                {/* Background Grid */}
+                <circle cx="100" cy="100" r="80" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+                <circle cx="100" cy="100" r="60" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
+
+                {/* Central pulse */}
+                <circle cx="100" cy="100" r="85" fill="url(#glow)" className={color === 'amber' ? 'animate-pulse-glow-amber' : 'animate-pulse-glow-orange'} />
+
+                {/* Rotating scanners */}
+                <g className="animate-rotate">
+                    <path d="M 100,20 a 80,80 0 0,1 0,160" stroke={progressColorClass} strokeWidth="2" fill="none" opacity="0.5" strokeDasharray="5 20" />
+                </g>
+                 <g className="animate-rotate-fast" style={{ animationDirection: 'reverse' }}>
+                    <path d="M 20,100 a 80,80 0 0,1 160,0" stroke={progressColorClass} strokeWidth="1" fill="none" opacity="0.3" strokeDasharray="2 10" />
+                </g>
+
+                {/* Progress Track */}
+                <circle className="text-slate-800/50" strokeWidth="6" stroke="currentColor" fill="transparent" r={radius} cx="100" cy="100" />
+                
+                {/* Progress Bar */}
+                <circle
+                    className={cn(progressColorClass, "transition-all duration-500")}
+                    strokeWidth="8"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={offset}
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    fill="none"
+                    r={radius}
+                    cx="100"
+                    cy="100"
+                    transform="rotate(-90 100 100)"
+                    style={{ filter: `drop-shadow(0 0 5px currentColor)` }}
+                />
+            </svg>
+        </div>
     );
 };
 
@@ -259,42 +309,399 @@ const GlobalTimer: React.FC<{
     }
 
     return (
-        <div className={cn(baseClasses, dynamicClasses, "bottom-5 right-5 p-4 animate-fadeIn w-80")}>
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="font-semibold text-gray-200 truncate pr-2" title={timerName}>{timerName}</h3>
-                <Button onClick={() => setIsMinimized(true)} size="sm" variant="ghost" className="p-2"><MinimizeIcon className="w-5 h-5" /></Button>
-            </div>
-
-            <div className="relative flex justify-center items-center my-4">
-                {targetDuration && <CircularProgress progress={progress} isUrgent={isUrgent} isOverTime={isOverTime} />}
-                <div className={cn("absolute font-display font-bold text-4xl tracking-wider", timeColorClass)}>
-                    {isOverTime ? overtimeDisplay : displayTime}
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/50" aria-modal="true" role="dialog">
+            <div className={cn(
+                "relative bg-slate-900/80 backdrop-blur-xl border rounded-lg transition-all duration-300",
+                dynamicClasses,
+                "w-full h-full md:w-[80vw] md:h-[80vh] flex flex-col items-center justify-center p-4 md:p-8 animate-fadeIn"
+            )}>
+                <div className="absolute top-4 right-4">
+                    <Button onClick={() => setIsMinimized(true)} size="sm" variant="ghost" className="p-2"><MinimizeIcon className="w-8 h-8" /></Button>
                 </div>
-            </div>
-
-            {targetDuration && (
-                <div className="text-center text-xs space-y-1 mb-4">
-                    <p>Target: <span className="font-semibold text-gray-300">{formatDuration(targetDuration)}</span></p>
-                    {isOverTime 
-                        ? <p className="font-bold text-red-400">OVER TIME</p> 
-                        : <p>Remaining: <span className="font-semibold text-gray-300">{formatDuration(timeRemaining!)}</span></p>
-                    }
+                <h3 className="font-display font-semibold text-gray-200 truncate text-2xl md:text-3xl mb-4 md:mb-8 text-center" title={timerName}>{timerName}</h3>
+                <div className="relative flex justify-center items-center my-4 flex-grow w-full max-w-lg aspect-square">
+                     <CircularProgress progress={progress} isUrgent={isUrgent} isOverTime={isOverTime} className="w-full h-full" color="amber" />
+                     <div className={cn("absolute font-display font-bold text-7xl md:text-8xl tracking-wider", timeColorClass)}>
+                        {isOverTime ? overtimeDisplay : displayTime}
+                    </div>
                 </div>
-            )}
-
-            <div className="flex justify-center gap-3">
-                {activeTimer.isPaused ? (
-                    <Button onClick={resumeTimer} variant="secondary" className="flex-1"><PlayIcon className="w-5 h-5" /> Resume</Button>
-                ) : (
-                    <Button onClick={pauseTimer} variant="secondary" className="flex-1"><PauseIcon className="w-5 h-5" /> Pause</Button>
+                {targetDuration && (
+                    <div className="text-center text-base md:text-lg space-y-1 my-4 md:my-8 font-display">
+                        <p>Target: <span className="font-semibold text-gray-300">{formatDuration(targetDuration)}</span></p>
+                        {isOverTime 
+                            ? <p className="font-bold text-red-400">OVER TIME</p> 
+                            : <p>Remaining: <span className="font-semibold text-gray-300">{formatDuration(timeRemaining!)}</span></p>
+                        }
+                    </div>
                 )}
-                <Button onClick={stopTimer} variant="danger" className="flex-1"><StopCircleIcon className="w-5 h-5" /> Stop</Button>
+                <div className="flex justify-center gap-4 mt-4 md:mt-8 w-full max-w-md">
+                    {activeTimer.isPaused ? (
+                        <Button onClick={resumeTimer} variant="secondary" size="lg" className="flex-1"><PlayIcon className="w-6 h-6" /> Resume</Button>
+                    ) : (
+                        <Button onClick={pauseTimer} variant="secondary" size="lg" className="flex-1"><PauseIcon className="w-6 h-6" /> Pause</Button>
+                    )}
+                    <Button onClick={stopTimer} variant="danger" size="lg" className="flex-1"><StopCircleIcon className="w-6 h-6" /> Stop</Button>
+                </div>
             </div>
         </div>
     );
 };
 
+const GlobalBreakTimer: React.FC<{
+    activeBreak: ActiveBreak | null;
+    pauseTimer: () => void;
+    resumeTimer: () => void;
+    stopTimer: () => void;
+}> = ({ activeBreak, pauseTimer, resumeTimer, stopTimer }) => {
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);
+    const [isMinimized, setIsMinimized] = useState(true);
+
+    useEffect(() => {
+        let interval: ReturnType<typeof setInterval>;
+        if (activeBreak && !activeBreak.isPaused) {
+            interval = setInterval(() => {
+                const elapsed = activeBreak.elapsedTime + (Date.now() - activeBreak.startTime);
+                setElapsedSeconds(Math.floor(elapsed / 1000));
+            }, 1000);
+        } else if (activeBreak) {
+             setElapsedSeconds(Math.floor(activeBreak.elapsedTime / 1000));
+        }
+        return () => clearInterval(interval);
+    }, [activeBreak]);
+
+    if (!activeBreak) return null;
+
+    const timerName = activeBreak.type === 'Other' ? activeBreak.customType : activeBreak.type;
+    const { targetDuration } = activeBreak;
+    
+    const baseClasses = "fixed z-[60] bg-slate-900/80 backdrop-blur-xl border rounded-lg transition-all duration-300";
+    const dynamicClasses = "border-brand-orange-400/30 shadow-[0_0_15px_rgba(251,146,60,0.4)]";
+    const timeColorClass = "text-brand-orange-400";
+    
+    const displayTime = formatDuration(elapsedSeconds).replace(/ /g, '');
+
+    if (isMinimized) {
+        return (
+            <div className={cn(baseClasses, dynamicClasses, "bottom-20 md:bottom-5 right-5 flex items-center justify-between gap-4 p-3 animate-fadeIn w-64")}>
+                <div className="flex-1 min-w-0">
+                    <p className={cn("font-display font-bold text-2xl tracking-wider", timeColorClass)}>
+                        {displayTime}
+                    </p>
+                    <p className="text-xs text-gray-300 truncate" title={timerName}>{timerName}</p>
+                </div>
+                <div className="flex flex-col items-center gap-1.5">
+                    <Button onClick={() => setIsMinimized(false)} size="sm" variant="ghost" className="p-2"><MaximizeIcon className="w-4 h-4" /></Button>
+                    {activeBreak.isPaused ? (
+                        <Button onClick={resumeTimer} size="sm" variant="secondary" aria-label="Resume Timer" className="p-2"><PlayIcon className="w-4 h-4" /></Button>
+                    ) : (
+                        <Button onClick={pauseTimer} size="sm" variant="secondary" aria-label="Pause Timer" className="p-2"><PauseIcon className="w-4 h-4" /></Button>
+                    )}
+                    <Button onClick={stopTimer} size="sm" variant="danger" aria-label="Stop Timer" className="p-2"><StopCircleIcon className="w-4 h-4" /></Button>
+                </div>
+            </div>
+        );
+    }
+    
+    let timeRemaining = targetDuration ? targetDuration - elapsedSeconds : null;
+    let isOverTime = timeRemaining !== null && timeRemaining < 0;
+    const overtimeDisplay = isOverTime ? `+${formatDuration(Math.abs(timeRemaining!))}` : null;
+    const displayFullTime = isOverTime ? overtimeDisplay : displayTime;
+    let progress = targetDuration ? Math.min(100, (elapsedSeconds / targetDuration) * 100) : 0;
+
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/50" aria-modal="true" role="dialog">
+            <div className={cn(
+                "relative bg-slate-900/80 backdrop-blur-xl border rounded-lg transition-all duration-300",
+                dynamicClasses,
+                "w-full h-full md:w-[80vw] md:h-[80vh] flex flex-col items-center justify-center p-4 md:p-8 animate-fadeIn"
+            )}>
+                <div className="absolute top-4 right-4">
+                    <Button onClick={() => setIsMinimized(true)} size="sm" variant="ghost" className="p-2"><MinimizeIcon className="w-8 h-8" /></Button>
+                </div>
+                <h3 className="font-display font-semibold text-gray-200 truncate text-2xl md:text-3xl mb-4 md:mb-8 text-center" title={timerName}>{timerName}</h3>
+                <div className="relative flex justify-center items-center my-4 flex-grow w-full max-w-lg aspect-square">
+                     <CircularProgress progress={progress} isUrgent={false} isOverTime={isOverTime} className="w-full h-full" color="orange" />
+                     <div className={cn("absolute font-display font-bold text-7xl md:text-8xl tracking-wider", isOverTime ? 'text-red-400' : timeColorClass)}>
+                        {displayFullTime}
+                    </div>
+                </div>
+                 {targetDuration && (
+                    <div className="text-center text-base md:text-lg space-y-1 my-4 md:my-8 font-display">
+                        <p>Target: <span className="font-semibold text-gray-300">{formatDuration(targetDuration)}</span></p>
+                        {isOverTime 
+                            ? <p className="font-bold text-red-400">OVER TIME</p> 
+                            : <p>Remaining: <span className="font-semibold text-gray-300">{formatDuration(timeRemaining!)}</span></p>
+                        }
+                    </div>
+                )}
+                 <div className="flex justify-center gap-4 mt-4 md:mt-8 w-full max-w-md">
+                    {activeBreak.isPaused ? (
+                        <Button onClick={resumeTimer} variant="secondary" size="lg" className="flex-1"><PlayIcon className="w-6 h-6" /> Resume</Button>
+                    ) : (
+                        <Button onClick={pauseTimer} variant="secondary" size="lg" className="flex-1"><PauseIcon className="w-6 h-6" /> Pause</Button>
+                    )}
+                    <Button onClick={stopTimer} variant="danger" size="lg" className="flex-1"><StopCircleIcon className="w-6 h-6" /> Stop</Button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
 // --- Modals ---
+
+const ConfirmBreakModal: React.FC<{
+    breakInfo: { type: BreakType; customType?: string; duration: number } | null;
+    onConfirm: (duration: number, notes?: string) => void;
+    onClose: () => void;
+}> = ({ breakInfo, onConfirm, onClose }) => {
+    const [duration, setDuration] = useState(breakInfo?.duration || 0);
+    const [notes, setNotes] = useState('');
+
+    useEffect(() => {
+        setDuration(breakInfo?.duration || 0);
+        setNotes('');
+    }, [breakInfo]);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (breakInfo) {
+            onConfirm(duration, notes.trim() ? notes : undefined);
+        }
+    };
+
+    if (!breakInfo) return null;
+    const breakName = breakInfo.type === 'Other' ? breakInfo.customType : breakInfo.type;
+
+    return (
+        <Modal isOpen={!!breakInfo} onClose={onClose} title={`Log Break Session: ${breakName}`}>
+            <form onSubmit={handleSubmit}>
+                <p className="text-sm text-gray-300">Your break was automatically timed. Confirm or edit the duration before saving.</p>
+                <TimeEditor initialDuration={breakInfo.duration} onDurationChange={setDuration} />
+                <div className="mt-4">
+                    <label className="block text-sm font-medium mb-1 font-display">Notes (Optional)</label>
+                    <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g., Quick chat with family" rows={2}/>
+                </div>
+                <div className="flex justify-end gap-2 mt-6">
+                    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button type="submit">Log Break</Button>
+                </div>
+            </form>
+        </Modal>
+    );
+};
+
+
+const AddManualBreakModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onAdd: (session: Omit<BreakSession, 'id'>) => void;
+}> = ({ isOpen, onClose, onAdd }) => {
+    const [breakType, setBreakType] = useState<BreakType>('Short Break');
+    const [customType, setCustomType] = useState('');
+    const [duration, setDuration] = useState(900); // 15 mins
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [notes, setNotes] = useState('');
+
+    const breakOptions: { value: BreakType, label: string, icon: React.ReactElement }[] = [
+        { value: 'Short Break', label: 'Short Break', icon: <CoffeeIcon className="w-5 h-5" /> },
+        { value: 'Meal', label: 'Meal', icon: <UtensilsIcon className="w-5 h-5" /> },
+        { value: 'Exercise', label: 'Exercise', icon: <DumbbellIcon className="w-5 h-5" /> },
+        { value: 'Hobby', label: 'Hobby', icon: <PaintBrushIcon className="w-5 h-5" /> },
+        { value: 'Nap', label: 'Nap', icon: <BedIcon className="w-5 h-5" /> },
+        { value: 'Other', label: 'Other', icon: <div className="w-5 h-5" /> },
+    ];
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (breakType === 'Other' && !customType.trim()) {
+            alert('Please specify your activity for "Other".');
+            return;
+        }
+        if (duration <= 0) {
+            alert('Please enter a valid duration.');
+            return;
+        }
+        const sessionDate = new Date(date);
+        onAdd({
+            type: breakType,
+            customType,
+            date: sessionDate.toISOString(),
+            duration,
+            notes: notes.trim() ? notes : undefined,
+        });
+        // Reset form
+        setBreakType('Short Break');
+        setCustomType('');
+        setDuration(900);
+        setDate(new Date().toISOString().split('T')[0]);
+        setNotes('');
+    };
+    
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Manually Add Break">
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium mb-1 font-display">Activity Type</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {breakOptions.map(opt => (
+                            <button
+                                type="button"
+                                key={opt.value}
+                                onClick={() => setBreakType(opt.value)}
+                                className={cn(
+                                    "flex items-center gap-2 p-3 rounded-lg border-2 transition-all",
+                                    breakType === opt.value ? "border-brand-orange-400 bg-brand-orange-400/10" : "border-slate-700 bg-slate-800/50 hover:bg-slate-700/50"
+                                )}
+                            >
+                                {opt.icon}
+                                <span className="text-sm font-semibold">{opt.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {breakType === 'Other' && (
+                    <div className="animate-fadeIn">
+                        <label className="block text-sm font-medium mb-1 font-display">Specify Activity</label>
+                        <Input type="text" value={customType} onChange={e => setCustomType(e.target.value)} placeholder="e.g., Family time, errands" required/>
+                    </div>
+                )}
+
+                <TimeEditor initialDuration={duration} onDurationChange={setDuration} label="Break Duration" />
+
+                <div>
+                    <label className="block text-sm font-medium mb-1 font-display">Date</label>
+                    <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+                </div>
+                
+                <div>
+                    <label className="block text-sm font-medium mb-1 font-display">Notes (Optional)</label>
+                    <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any details about this break?" rows={2}/>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button type="submit" className="bg-brand-orange-400 text-brand-orange-900 hover:bg-brand-orange-400/80 focus:ring-brand-orange-400">Add Break</Button>
+                </div>
+            </form>
+        </Modal>
+    );
+};
+
+
+const TakeBreakModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onStart: (type: BreakType, customType?: string, duration?: number) => void;
+}> = ({ isOpen, onClose, onStart }) => {
+    const [breakType, setBreakType] = useState<BreakType>('Short Break');
+    const [customType, setCustomType] = useState('');
+    const [duration, setDuration] = useState(900); // 15 mins
+
+    const breakOptions: { value: BreakType, label: string, icon: React.ReactElement }[] = [
+        { value: 'Short Break', label: 'Short Break', icon: <CoffeeIcon className="w-5 h-5" /> },
+        { value: 'Meal', label: 'Meal', icon: <UtensilsIcon className="w-5 h-5" /> },
+        { value: 'Exercise', label: 'Exercise', icon: <DumbbellIcon className="w-5 h-5" /> },
+        { value: 'Hobby', label: 'Hobby', icon: <PaintBrushIcon className="w-5 h-5" /> },
+        { value: 'Nap', label: 'Nap', icon: <BedIcon className="w-5 h-5" /> },
+        { value: 'Other', label: 'Other', icon: <div className="w-5 h-5" /> },
+    ];
+    
+    const handleStart = (withTarget: boolean) => {
+        if (breakType === 'Other' && !customType.trim()) {
+            alert('Please specify your activity for "Other".');
+            return;
+        }
+        onStart(breakType, customType, withTarget ? duration : undefined);
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Take a Break">
+            <p className="text-sm text-gray-300 mb-4">Choose your break activity. A timer will help you get back to your studies on time.</p>
+            
+            <label className="block text-sm font-medium mb-1 font-display">Activity Type</label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
+                {breakOptions.map(opt => (
+                    <button
+                        key={opt.value}
+                        onClick={() => setBreakType(opt.value)}
+                        className={cn(
+                            "flex items-center gap-2 p-3 rounded-lg border-2 transition-all",
+                            breakType === opt.value ? "border-brand-orange-400 bg-brand-orange-400/10" : "border-slate-700 bg-slate-800/50 hover:bg-slate-700/50"
+                        )}
+                    >
+                        {opt.icon}
+                        <span className="text-sm font-semibold">{opt.label}</span>
+                    </button>
+                ))}
+            </div>
+
+            {breakType === 'Other' && (
+                <div className="animate-fadeIn">
+                    <label className="block text-sm font-medium mb-1 font-display">Specify Activity</label>
+                    <Input 
+                        type="text" 
+                        value={customType} 
+                        onChange={e => setCustomType(e.target.value)} 
+                        placeholder="e.g., Family time, errands"
+                    />
+                </div>
+            )}
+
+            <TimeEditor initialDuration={duration} onDurationChange={setDuration} label="Set Break Duration (Optional)" />
+
+            <div className="flex justify-end gap-2 mt-6">
+                <Button type="button" variant="secondary" onClick={() => handleStart(false)}>Start Open-ended</Button>
+                <Button type="button" onClick={() => handleStart(true)} className="bg-brand-orange-400 text-brand-orange-900 hover:bg-brand-orange-400/80 focus:ring-brand-orange-400">Start Timed Break</Button>
+            </div>
+        </Modal>
+    );
+};
+
+const WelcomeBackModal: React.FC<{
+    breakInfo: { duration: number; type: BreakType; customType?: string } | null;
+    tasks: Task[];
+    onClose: () => void;
+    onStartTask: (task: Task) => void;
+}> = ({ breakInfo, tasks, onClose, onStartTask }) => {
+    if (!breakInfo) return null;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const pendingTodayTasks = tasks.filter(t => t.date === today && t.status === 'Pending');
+
+    return (
+        <Modal isOpen={!!breakInfo} onClose={onClose} title="Welcome Back!">
+            <div className="text-center">
+                <p className="text-gray-300">You took a <strong className="text-brand-orange-400">{formatDuration(breakInfo.duration)}</strong> break for</p>
+                <p className="font-display text-2xl font-bold text-white my-2">{breakInfo.type === 'Other' ? breakInfo.customType : breakInfo.type}.</p>
+                <p className="text-lg text-gray-300">Ready to get back to it?</p>
+            </div>
+
+            {pendingTodayTasks.length > 0 && (
+                <div className="mt-6 border-t border-white/10 pt-4">
+                    <h4 className="font-semibold text-center mb-3">What's next for today?</h4>
+                    <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
+                        {pendingTodayTasks.map(task => (
+                            <div key={task.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                                <div className="min-w-0">
+                                    <p className="font-semibold truncate">{task.name}</p>
+                                    <p className="text-xs text-gray-400">{task.chapter}</p>
+                                </div>
+                                <Button onClick={() => onStartTask(task)} size="sm">Start</Button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <div className="flex justify-end mt-6">
+                <Button type="button" variant="secondary" onClick={onClose}>Dismiss</Button>
+            </div>
+        </Modal>
+    );
+};
 
 const TargetDurationModal: React.FC<{
     isOpen: boolean;
@@ -568,7 +975,7 @@ const SpacedRevisionModal: React.FC<{
         ? 'border-red-500/80 shadow-glow-amber-lg animate-pulseGlow' 
         : isUrgent 
         ? 'border-yellow-500/80 animate-pulseGlow' 
-        : 'border-cyan-400/20';
+        : 'border-brand-amber-400/20';
 
     const handleComplete = () => {
         setIsActive(false);
@@ -590,9 +997,9 @@ const SpacedRevisionModal: React.FC<{
                     <label className="block mb-2 font-display text-lg text-center">How difficult did you feel instantly?</label>
                     <div className="flex items-center gap-4 my-4">
                         <span className="text-sm text-gray-400">Easy</span>
-                        <input type="range" min="1" max="5" value={difficulty} onChange={e => setDifficulty(Number(e.target.value))} className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer range-lg accent-cyan-500" />
+                        <input type="range" min="1" max="5" value={difficulty} onChange={e => setDifficulty(Number(e.target.value))} className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer range-lg accent-brand-amber-500" />
                         <span className="text-sm text-gray-400">Hard</span>
-                        <span className="font-bold text-cyan-400 text-2xl w-8 text-center">{difficulty}</span>
+                        <span className="font-bold text-brand-amber-400 text-2xl w-8 text-center">{difficulty}</span>
                     </div>
                 </div>
 
@@ -617,7 +1024,7 @@ const SpacedRevisionModal: React.FC<{
 
                 <div className="flex justify-center gap-4 mt-6">
                     <Button variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleComplete} className="bg-cyan-500 text-cyan-900 hover:bg-cyan-400 focus:ring-cyan-500 shadow-glow-amber">Finish Revision</Button>
+                    <Button onClick={handleComplete} className="bg-brand-amber-500 text-brand-amber-900 hover:bg-brand-amber-400 focus:ring-brand-amber-500 shadow-glow-amber">Finish Revision</Button>
                 </div>
             </div>
         </Modal>
@@ -628,7 +1035,9 @@ const SpacedRevisionModal: React.FC<{
 const App: React.FC = () => {
     const tasks = useLiveQuery(() => db.tasks.orderBy('date').toArray(), []);
     const testPlans = useLiveQuery(() => db.testPlans.orderBy('date').toArray(), []);
+    const breakSessions = useLiveQuery(() => db.breakSessions.toArray(), []);
     const activeTimer = useLiveQuery(() => getMiscItem<ActiveTimer | null>('activeTimer', null), null);
+    const activeBreak = useLiveQuery(() => getMiscItem<ActiveBreak | null>('activeBreak', null), null);
     const [targetScore, setTargetScore] = useState(680);
 
     const [timerSetup, setTimerSetup] = useState<{ task?: Task; test?: TestPlan } | null>(null);
@@ -639,6 +1048,23 @@ const App: React.FC = () => {
     const [revisingTask, setRevisingTask] = useState<Task | null>(null);
     const { usagePercentage, refreshUsage } = useStorageUsage();
     
+    const [isBreakModalOpen, setIsBreakModalOpen] = useState(false);
+    const [isManualBreakModalOpen, setIsManualBreakModalOpen] = useState(false);
+    const [breakToConfirm, setBreakToConfirm] = useState<{ type: BreakType; customType?: string; duration: number } | null>(null);
+    const [breakToFinalize, setBreakToFinalize] = useState<{ duration: number; type: BreakType; customType?: string } | null>(null);
+    
+    // State for global report generation
+    const [isGenerateReportModalOpen, setIsGenerateReportModalOpen] = useState(false);
+    const [reportType, setReportType] = useState<'Daily' | 'Weekly' | 'Monthly' | 'Overall'>('Daily');
+    const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
+    const [reportWeek, setReportWeek] = useState(getCurrentWeekString());
+    const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7));
+    const [activeReport, setActiveReport] = useState<{ type: string; date?: string; week?: string; month?: string; } | null>(null);
+
+    // State for Tools FAB
+    const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
+
+
     useEffect(() => {
         getMiscItem('targetScore', 680).then(setTargetScore);
     }, []);
@@ -677,7 +1103,7 @@ const App: React.FC = () => {
 
     // --- Timer Logic ---
      const startTaskTimer = (task: Task) => {
-        if (activeTimer) {
+        if (activeTimer || activeBreak) {
              alert("Another timer is already running. Please stop it before starting a new one.");
             return;
         }
@@ -685,7 +1111,7 @@ const App: React.FC = () => {
     };
 
     const startTestTimer = (test: TestPlan) => {
-        if (activeTimer) {
+        if (activeTimer || activeBreak) {
              alert("Another timer is already running. Please stop it before starting a new one.");
             return;
         }
@@ -725,7 +1151,7 @@ const App: React.FC = () => {
         setMiscItem('activeTimer', newTimer);
     };
 
-    const stopTimer = () => {
+    const stopStudyTimer = () => {
         if (!activeTimer) return;
         const finalElapsedTime = activeTimer.elapsedTime + (activeTimer.isPaused ? 0 : (Date.now() - activeTimer.startTime));
         const durationInSeconds = Math.round(finalElapsedTime / 1000);
@@ -746,6 +1172,81 @@ const App: React.FC = () => {
         
         setMiscItem('activeTimer', null);
     };
+
+    const handleStartBreak = (type: BreakType, customType?: string, duration?: number) => {
+        if (activeTimer || activeBreak) {
+            alert("A timer is already running. Please stop it before starting a break.");
+            return;
+        }
+
+        const newBreak: ActiveBreak = {
+            type,
+            customType,
+            startTime: Date.now(),
+            elapsedTime: 0,
+            isPaused: false,
+            targetDuration: duration,
+        };
+        setMiscItem('activeBreak', newBreak);
+        setIsBreakModalOpen(false);
+    };
+
+    const pauseBreakTimer = async () => {
+        const breakTimer = await getMiscItem<ActiveBreak | null>('activeBreak', null);
+        if (!breakTimer || breakTimer.isPaused) return;
+        const newTimer = { ...breakTimer, elapsedTime: breakTimer.elapsedTime + (Date.now() - breakTimer.startTime), isPaused: true };
+        setMiscItem('activeBreak', newTimer);
+    };
+
+    const resumeBreakTimer = async () => {
+        const breakTimer = await getMiscItem<ActiveBreak | null>('activeBreak', null);
+        if (!breakTimer || !breakTimer.isPaused) return;
+        const newTimer = { ...breakTimer, startTime: Date.now(), isPaused: false };
+        setMiscItem('activeBreak', newTimer);
+    };
+
+    const stopBreakTimer = async () => {
+        if (!activeBreak) return;
+        const finalElapsedTime = activeBreak.elapsedTime + (activeBreak.isPaused ? 0 : (Date.now() - activeBreak.startTime));
+        const durationInSeconds = Math.round(finalElapsedTime / 1000);
+
+        await setMiscItem('activeBreak', null);
+        
+        if (durationInSeconds > 0) {
+            setBreakToConfirm({
+                duration: durationInSeconds,
+                type: activeBreak.type,
+                customType: activeBreak.customType,
+            });
+        }
+    };
+    
+    const handleConfirmBreakSession = async (duration: number, notes?: string) => {
+        if (!breakToConfirm) return;
+        const newBreakSession: BreakSession = {
+            id: crypto.randomUUID(),
+            type: breakToConfirm.type,
+            customType: breakToConfirm.customType,
+            date: new Date().toISOString(),
+            duration,
+            notes,
+        };
+
+        await db.breakSessions.add(newBreakSession);
+        
+        setBreakToFinalize({
+            duration,
+            type: breakToConfirm.type,
+            customType: breakToConfirm.customType,
+        });
+        setBreakToConfirm(null);
+    };
+
+    const handleAddManualBreak = async (session: Omit<BreakSession, 'id'>) => {
+        await db.breakSessions.add({ ...session, id: crypto.randomUUID() });
+        setIsManualBreakModalOpen(false);
+    };
+
 
     const handleConfirmSession = (task: Task, duration: number) => {
         const newSession: StudySession = {
@@ -780,7 +1281,7 @@ const App: React.FC = () => {
                 const newTaskId = await db.tasks.add(finalTask);
                 
                 if (originalTask.taskType === 'Lecture') {
-                    await createSpacedRevisionTasks(originalTask, newTaskId);
+                    await createSpacedRevisionTasks(originalTask, newTaskId as string);
                 }
 
             } else { // Existing task from Planner
@@ -812,13 +1313,12 @@ const App: React.FC = () => {
 
         // FIX: Explicitly type `newRevisionTasks` as `Task[]` to prevent TypeScript
         // from inferring `taskType` as a generic `string` instead of the specific `TaskType`.
-        const newRevisionTasks: Task[] = revisionDays
+        const newRevisionTasks: Omit<Task, "id">[] = revisionDays
             .filter(day => !existingDays.has(day))
             .map(day => {
                 const revisionDate = new Date();
                 revisionDate.setDate(revisionDate.getDate() + day);
                 return {
-                    id: crypto.randomUUID(),
                     name: `Day ${day} Spaced Revision for "${originalTask.name}"`,
                     subject: originalTask.subject,
                     chapter: originalTask.chapter,
@@ -834,7 +1334,7 @@ const App: React.FC = () => {
             });
         
         if (newRevisionTasks.length > 0) {
-            await db.tasks.bulkAdd(newRevisionTasks);
+            await db.tasks.bulkAdd(newRevisionTasks.map(t => ({...t, id: crypto.randomUUID()})));
         }
     };
 
@@ -907,7 +1407,7 @@ const App: React.FC = () => {
             };
             db.tasks.add(finalTask);
 
-            const testNameMatch = taskToFinalize.task.notes.match(/For upcoming test: "([^"]+)"/);
+            const testNameMatch = taskToFinalize.task.notes?.match(/For upcoming test: "([^"]+)"/);
             if (testNameMatch) {
                 const testName = testNameMatch[1];
                  db.testPlans.where({ name: testName, status: 'Upcoming' }).first().then(test => {
@@ -964,7 +1464,79 @@ const App: React.FC = () => {
         setTaskToFinalize(null);
     }
 
-    if (tasks === undefined || testPlans === undefined || activeTimer === undefined) {
+    const handleGenerateReport = () => {
+        if (reportType === 'Daily' && !reportDate) {
+            alert('Please select a date.');
+            return;
+        }
+        if (reportType === 'Weekly' && !reportWeek) {
+            alert('Please select a week.');
+            return;
+        }
+        if (reportType === 'Monthly' && !reportMonth) {
+            alert('Please select a month.');
+            return;
+        }
+        setActiveReport({ type: reportType, date: reportDate, week: reportWeek, month: reportMonth });
+        setIsGenerateReportModalOpen(false);
+    };
+
+    const GenerateReportModal: React.FC<{
+        isOpen: boolean;
+        onClose: () => void;
+    }> = ({ isOpen, onClose }) => {
+        return (
+            <Modal isOpen={isOpen} onClose={onClose} title="Generate Report">
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium mb-1 font-display">Report Type</label>
+                        <Select value={reportType} onChange={e => setReportType(e.target.value as any)}>
+                            <option value="Daily">Daily</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="Monthly">Monthly</option>
+                            <option value="Overall">Overall</option>
+                        </Select>
+                    </div>
+                    {reportType === 'Daily' && (
+                        <div>
+                            <label className="block text-sm font-medium mb-1 font-display">Date</label>
+                            <Input 
+                                type="date" 
+                                value={reportDate} 
+                                onChange={e => setReportDate(e.target.value)}
+                            />
+                        </div>
+                    )}
+                    {reportType === 'Weekly' && (
+                        <div>
+                            <label className="block text-sm font-medium mb-1 font-display">Week</label>
+                            <Input 
+                                type="week" 
+                                value={reportWeek}
+                                onChange={e => setReportWeek(e.target.value)}
+                            />
+                        </div>
+                    )}
+                    {reportType === 'Monthly' && (
+                        <div>
+                            <label className="block text-sm font-medium mb-1 font-display">Month</label>
+                            <Input 
+                                type="month"
+                                value={reportMonth}
+                                onChange={e => setReportMonth(e.target.value)}
+                            />
+                        </div>
+                    )}
+                </div>
+                <div className="flex justify-end gap-2 mt-6">
+                    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button type="button" onClick={handleGenerateReport}>Generate</Button>
+                </div>
+            </Modal>
+        );
+    };
+
+    if (tasks === undefined || testPlans === undefined || activeTimer === undefined || activeBreak === undefined) {
         return (
             <div className="flex items-center justify-center min-h-screen text-gray-200 bg-slate-950">
                 <p>Loading database...</p>
@@ -1015,7 +1587,63 @@ const App: React.FC = () => {
                     <Route path="/settings" element={<Settings />} />
                 </Routes>
             </main>
-            <GlobalTimer activeTimer={activeTimer} pauseTimer={pauseTimer} resumeTimer={resumeTimer} stopTimer={stopTimer} />
+            <GlobalTimer activeTimer={activeTimer} pauseTimer={pauseTimer} resumeTimer={resumeTimer} stopTimer={stopStudyTimer} />
+            <GlobalBreakTimer activeBreak={activeBreak} pauseTimer={pauseBreakTimer} resumeTimer={resumeBreakTimer} stopTimer={stopBreakTimer} />
+
+            {!activeTimer && !activeBreak && (
+                <>
+                    {/* Backdrop */}
+                    {isToolsMenuOpen && (
+                        <div 
+                            className="fixed inset-0 z-[55] bg-black/50 animate-fadeIn"
+                            onClick={() => setIsToolsMenuOpen(false)}
+                            aria-hidden="true"
+                        ></div>
+                    )}
+
+                    <div className="fixed bottom-20 md:bottom-5 right-5 z-[60] flex flex-col items-end gap-4">
+                        {/* Secondary actions */}
+                        <div
+                            className={cn(
+                                "flex flex-col items-end gap-4 transition-all duration-300 ease-in-out",
+                                isToolsMenuOpen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
+                            )}
+                        >
+                            {[
+                                { label: "Take a Break", icon: <CoffeeIcon className="w-6 h-6" />, action: () => setIsBreakModalOpen(true), className: "bg-brand-orange-400/90 hover:bg-brand-orange-400" },
+                                { label: "Add Manual Break", icon: <PlusIcon className="w-6 h-6" />, action: () => setIsManualBreakModalOpen(true), className: "bg-slate-600/90 hover:bg-slate-500" },
+                                { label: "Generate Report", icon: <BarChartIcon className="w-6 h-6" />, action: () => setIsGenerateReportModalOpen(true), className: "bg-cyan-500/90 hover:bg-cyan-500" },
+                            ].map((item) => (
+                                <div key={item.label} className="flex items-center gap-3">
+                                    <span className="bg-slate-900/80 text-white text-sm font-semibold px-3 py-1 rounded-md shadow-lg">{item.label}</span>
+                                    <Button 
+                                        onClick={() => { item.action(); setIsToolsMenuOpen(false); }}
+                                        className={cn("h-12 w-12 rounded-full shadow-lg flex items-center justify-center text-white", item.className)}
+                                        aria-label={item.label}
+                                        tabIndex={isToolsMenuOpen ? 0 : -1}
+                                    >
+                                        {item.icon}
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                        
+                        {/* Main FAB */}
+                        <Button 
+                            onClick={() => setIsToolsMenuOpen(prev => !prev)}
+                            className="h-16 w-16 rounded-full shadow-lg flex items-center justify-center bg-brand-amber-500 text-white hover:bg-brand-amber-400 focus:ring-brand-amber-500"
+                            aria-label="Toggle tools menu"
+                            aria-expanded={isToolsMenuOpen}
+                        >
+                            <div className="relative h-8 w-8 flex items-center justify-center">
+                                <WrenchIcon className={cn("absolute transition-all duration-300", isToolsMenuOpen ? "opacity-0 -rotate-45 scale-50" : "opacity-100 rotate-0 scale-100")} />
+                                <XIcon className={cn("absolute transition-all duration-300", isToolsMenuOpen ? "opacity-100 rotate-0 scale-100" : "opacity-0 rotate-45 scale-50")} />
+                            </div>
+                        </Button>
+                    </div>
+                </>
+            )}
+            
             <BottomNavBar />
             
             <TargetDurationModal 
@@ -1029,6 +1657,34 @@ const App: React.FC = () => {
                 sessionInfo={sessionToConfirm}
                 onConfirm={handleConfirmSession}
                 onClose={() => setSessionToConfirm(null)}
+            />
+
+             <TakeBreakModal 
+                isOpen={isBreakModalOpen}
+                onClose={() => setIsBreakModalOpen(false)}
+                onStart={handleStartBreak}
+            />
+
+            <ConfirmBreakModal
+                breakInfo={breakToConfirm}
+                onConfirm={handleConfirmBreakSession}
+                onClose={() => setBreakToConfirm(null)}
+            />
+
+            <AddManualBreakModal
+                isOpen={isManualBreakModalOpen}
+                onClose={() => setIsManualBreakModalOpen(false)}
+                onAdd={handleAddManualBreak}
+            />
+
+            <WelcomeBackModal
+                breakInfo={breakToFinalize}
+                tasks={tasks || []}
+                onClose={() => setBreakToFinalize(null)}
+                onStartTask={(task) => {
+                    setBreakToFinalize(null);
+                    startTaskTimer(task);
+                }}
             />
 
             <CompleteLectureModal 
@@ -1048,6 +1704,44 @@ const App: React.FC = () => {
                 onClose={() => setRevisingTask(null)}
                 onComplete={handleCompleteRevision}
             />
+            
+            <GenerateReportModal isOpen={isGenerateReportModalOpen} onClose={() => setIsGenerateReportModalOpen(false)} />
+
+            {activeReport && activeReport.type === 'Daily' && (
+                <DailyReport
+                    date={new Date(new Date(activeReport.date!).toLocaleString("en-US", { timeZone: "UTC" }))}
+                    allTasks={tasks || []}
+                    allTestPlans={testPlans || []}
+                    allBreakSessions={breakSessions || []}
+                    onClose={() => setActiveReport(null)}
+                />
+            )}
+            {activeReport && activeReport.type === 'Weekly' && (
+                <WeeklyReport
+                    week={activeReport.week!}
+                    allTasks={tasks || []}
+                    allTestPlans={testPlans || []}
+                    allBreakSessions={breakSessions || []}
+                    onClose={() => setActiveReport(null)}
+                />
+            )}
+            {activeReport && activeReport.type === 'Monthly' && (
+                <MonthlyReport
+                    month={activeReport.month!}
+                    allTasks={tasks || []}
+                    allTestPlans={testPlans || []}
+                    allBreakSessions={breakSessions || []}
+                    onClose={() => setActiveReport(null)}
+                />
+            )}
+            {activeReport && activeReport.type === 'Overall' && (
+                <OverallReport
+                    allTasks={tasks || []}
+                    allTestPlans={testPlans || []}
+                    allBreakSessions={breakSessions || []}
+                    onClose={() => setActiveReport(null)}
+                />
+            )}
         </div>
     );
 }
