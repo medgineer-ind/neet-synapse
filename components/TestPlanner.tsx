@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { TestPlan, SubjectName, AnalyzedTopic, Task, TopicStatus, TestPlanAnalysis, TopicPracticeAttempt, ProgressStats, ActiveTimer, SubjectTestPerformance, ChapterStats, MicrotopicStats } from '../types';
 import { syllabus } from '../data/syllabus';
 import { cn, calculateProgress, analyzeSyllabusForTest, formatDuration, calculateOverallScore, getScoreColorClass } from '../lib/utils';
-import { PlusIcon, Trash2Icon, BrainIcon, ClipboardCheckIcon, ClockIcon, RepeatIcon, TargetIcon, TrophyIcon, AtomIcon, FlaskConicalIcon, LeafIcon, DnaIcon, ChevronDownIcon, TrendingUpIcon } from './ui/Icons';
+import { PlusIcon, Trash2Icon, BrainIcon, ClipboardCheckIcon, ClockIcon, RepeatIcon, TargetIcon, TrophyIcon, AtomIcon, FlaskConicalIcon, LeafIcon, DnaIcon, ChevronDownIcon, TrendingUpIcon, PencilIcon } from './ui/Icons';
 import { Card, Button, Input, Modal } from './ui/StyledComponents';
 import { TimeEditor } from './ui/TimeEditor';
 import { db } from '../services/db';
@@ -37,6 +37,133 @@ const TopicAnalysis: React.FC<{ weakTopics: AnalyzedTopic[]; averageTopics: Anal
         </div>
     </div>
 );
+
+const EditTestSyllabusModal: React.FC<{
+    test: TestPlan | null;
+    onClose: () => void;
+    onSave: (id: string, updates: Partial<TestPlan>) => void;
+    tasks: Task[];
+}> = ({ test, onClose, onSave, tasks }) => {
+    const [name, setName] = useState('');
+    const [date, setDate] = useState('');
+    const [totalQuestions, setTotalQuestions] = useState('');
+    const [selectedSyllabus, setSelectedSyllabus] = useState<TestPlan['syllabus']>({});
+
+    useEffect(() => {
+        if (test) {
+            setName(test.name);
+            setDate(test.date);
+            setTotalQuestions(String(test.totalQuestions || ''));
+            setSelectedSyllabus(test.syllabus || {});
+        }
+    }, [test]);
+    
+    const progressStats = useMemo(() => calculateProgress(tasks), [tasks]);
+    const { weakTopics, averageTopics, strongTopics } = useMemo(() => analyzeSyllabusForTest(selectedSyllabus, progressStats), [selectedSyllabus, progressStats]);
+
+    const handleChapterToggle = (subject: SubjectName, chapter: string) => {
+        setSelectedSyllabus(prev => {
+            const newSyllabus = { ...prev };
+            const subjectChapters = newSyllabus[subject] || [];
+            if (subjectChapters.includes(chapter)) {
+                newSyllabus[subject] = subjectChapters.filter(c => c !== chapter);
+                if (newSyllabus[subject]?.length === 0) {
+                    delete newSyllabus[subject];
+                }
+            } else {
+                newSyllabus[subject] = [...subjectChapters, chapter];
+            }
+            return newSyllabus;
+        });
+    };
+
+    const handleSaveChanges = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!test || !name.trim() || Object.keys(selectedSyllabus).length === 0 || !totalQuestions) {
+            alert('Please provide a test name, total questions, and select at least one chapter.');
+            return;
+        }
+        
+        const newTopicStatus: TopicStatus[] = [];
+        (Object.keys(selectedSyllabus) as SubjectName[]).forEach(subject => {
+            selectedSyllabus[subject]?.forEach(chapter => {
+                syllabus[subject][chapter].forEach(microtopic => {
+                    const existingTopic = test.topicStatus.find(ts => 
+                        ts.subject === subject && 
+                        ts.chapter === chapter && 
+                        ts.microtopic === microtopic
+                    );
+                    if (existingTopic) {
+                        newTopicStatus.push(existingTopic);
+                    } else {
+                        newTopicStatus.push({
+                            subject,
+                            chapter,
+                            microtopic,
+                            practiceAttempts: [],
+                        });
+                    }
+                });
+            });
+        });
+
+        const updates: Partial<TestPlan> = {
+            name,
+            date,
+            totalQuestions: Number(totalQuestions),
+            syllabus: selectedSyllabus,
+            topicStatus: newTopicStatus,
+        };
+
+        onSave(test.id, updates);
+    };
+    
+    if (!test) return null;
+
+    return (
+        <Modal isOpen={!!test} onClose={onClose} title={`Edit Test: ${test.name}`}>
+            <form onSubmit={handleSaveChanges}>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div className="md:col-span-2">
+                        <Input type="text" placeholder="Test Name" value={name} onChange={e => setName(e.target.value)} required />
+                    </div>
+                    <Input type="number" placeholder="Total Questions" value={totalQuestions} onChange={e => setTotalQuestions(e.target.value)} min="1" required />
+                    <div className="md:col-span-3">
+                        <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+                    </div>
+                </div>
+                
+                <h3 className="font-semibold text-brand-cyan-400 mb-2">Select Syllabus</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-h-60 overflow-y-auto p-2 bg-black/20 rounded-md">
+                    {(Object.keys(syllabus) as SubjectName[]).map(subject => (
+                        <div key={subject}>
+                            <h4 className="font-bold mb-2">{subject}</h4>
+                            <div className="space-y-1">
+                                {Object.keys(syllabus[subject]).map(chapter => (
+                                    <label key={chapter} className="flex items-center text-sm cursor-pointer">
+                                        <input type="checkbox"
+                                            className="mr-2 form-checkbox h-4 w-4 text-brand-cyan-500 bg-gray-800 border-gray-600 rounded focus:ring-brand-cyan-500 focus:ring-offset-0"
+                                            checked={selectedSyllabus[subject]?.includes(chapter) || false}
+                                            onChange={() => handleChapterToggle(subject, chapter)}
+                                        />
+                                        {chapter}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {Object.keys(selectedSyllabus).length > 0 && <div className="mt-4"><TopicAnalysis weakTopics={weakTopics} averageTopics={averageTopics} strongTopics={strongTopics} /></div>}
+                
+                <div className="flex justify-end gap-2 mt-6">
+                    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button type="submit" variant="primary">Save Changes</Button>
+                </div>
+            </form>
+        </Modal>
+    );
+};
 
 
 const CreateTestModal: React.FC<{ isOpen: boolean; onClose: () => void; onAddTest: (test: Omit<TestPlan, 'id'|'status'>) => void; tasks: Task[] }> = ({ isOpen, onClose, onAddTest, tasks }) => {
@@ -677,6 +804,7 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, testPlans, activeTimer
     const [initialDurationForAnalysis, setInitialDurationForAnalysis] = useState(0);
     const [chapterToRevise, setChapterToRevise] = useState<{ test: TestPlan; subject: SubjectName; chapter: string } | null>(null);
     const [chapterToPractice, setChapterToPractice] = useState<{ test: TestPlan; subject: SubjectName; chapter: string } | null>(null);
+    const [testToEdit, setTestToEdit] = useState<TestPlan | null>(null);
 
 
     useEffect(() => {
@@ -899,6 +1027,12 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, testPlans, activeTimer
         
         setChapterToPractice(null);
     };
+    
+    const handleSaveTestEdit = (id: string, updates: Partial<TestPlan>) => {
+        db.testPlans.update(id, updates).then(() => {
+            setTestToEdit(null);
+        });
+    };
 
 
     return (
@@ -934,6 +1068,9 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, testPlans, activeTimer
                                             <Button onClick={() => startTestTimer(test)} variant="primary" size="sm" disabled={!!activeTimer}><TrophyIcon className="w-4 h-4"/>Start Test</Button>
                                             <Button onClick={() => setExpandedTest(expandedTest === test.id ? null : test.id)} variant="secondary" size="sm">
                                                 {expandedTest === test.id ? 'Hide Prep' : 'Start Prep'}
+                                            </Button>
+                                            <Button onClick={() => setTestToEdit(test)} variant="ghost" size="sm" className="p-2" title="Edit Test">
+                                                <PencilIcon className="w-4 h-4" />
                                             </Button>
                                             <button onClick={() => deleteTest(test.id)} className="p-1 text-gray-400 hover:text-red-400 transition-colors"><Trash2Icon className="w-4 h-4" /></button>
                                         </div>
@@ -1095,6 +1232,12 @@ const TestPlanner: React.FC<TestPlannerProps> = ({ tasks, testPlans, activeTimer
             </section>
             
             <CreateTestModal isOpen={isCreateModalOpen} onClose={() => setCreateModalOpen(false)} onAddTest={addTest} tasks={tasks} />
+             <EditTestSyllabusModal 
+                test={testToEdit}
+                onClose={() => setTestToEdit(null)}
+                onSave={handleSaveTestEdit}
+                tasks={tasks}
+            />
             <TestAnalysisModal 
                 test={testToAnalyze}
                 initialDuration={initialDurationForAnalysis}

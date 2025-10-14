@@ -16,21 +16,21 @@ export class MySubClassedDexie extends Dexie {
     // FIX: Cast `this` to `Dexie` to make the `version()` method available.
     // TypeScript can fail to infer inherited methods on `this` inside the constructor
     // of a Dexie subclass.
-    this.version(3).stores({
+    (this as Dexie).version(3).stores({
         tasks: 'id, date, subject, status, taskType, priority, sourceLectureTaskId',
         testPlans: 'id, date, status',
         misc: 'key',
         breakSessions: 'id, date',
         dailyLogs: 'date',
     });
-    this.version(2).stores({
+    (this as Dexie).version(2).stores({
         tasks: 'id, date, subject, status, taskType, priority, sourceLectureTaskId',
         testPlans: 'id, date, status',
         misc: 'key', // Simple key-value store for single items
         breakSessions: 'id, date',
     });
      // Keep previous version schemas for upgrade path
-    this.version(1).stores({
+    (this as Dexie).version(1).stores({
         tasks: 'id, date, subject, status, taskType, priority, sourceLectureTaskId',
         testPlans: 'id, date, status',
         misc: 'key',
@@ -41,7 +41,7 @@ export class MySubClassedDexie extends Dexie {
 // FIX: Explicitly type `db` with an intersection of the class and its superclass `Dexie`.
 // This resolves a TypeScript type inference issue where methods on the superclass (e.g., `transaction`)
 // were not being recognized on the subclass instance in other files.
-export const db = new MySubClassedDexie();
+export const db: MySubClassedDexie & Dexie = new MySubClassedDexie();
 
 
 // Helper functions to manage single key-value items

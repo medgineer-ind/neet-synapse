@@ -120,7 +120,7 @@ const LiveBackground: React.FC = () => {
                 loop
                 muted
                 playsInline
-                className="absolute top-0 left-0 w-full h-full object-contain"
+                className="absolute top-0 left-0 w-full h-full object-cover"
                 src="./background.mp4"
             >
                 <source src="./background.mp4" type="video/mp4" />

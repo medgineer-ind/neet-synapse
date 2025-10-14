@@ -374,8 +374,10 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
             if (perfectRevisionDays.includes(todayStr) || perfectRevisionDays.includes(yesterdayStr)) {
                 revisionStreak = 1;
                 for (let i = perfectRevisionDays.length - 1; i > 0; i--) {
-                    const current = new Date(perfectRevisionDays[i]);
-                    const prev = new Date(perfectRevisionDays[i - 1]);
+                    // FIX: Cast array element to string to satisfy new Date() constructor overload.
+                    const current = new Date(perfectRevisionDays[i] as string);
+                    // FIX: Cast array element to string to satisfy new Date() constructor overload.
+                    const prev = new Date(perfectRevisionDays[i - 1] as string);
                     if ((current.getTime() - prev.getTime()) / (1000 * 3600 * 24) === 1) {
                         revisionStreak++;
                     } else {

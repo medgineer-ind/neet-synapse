@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Link, useLocation } from 'react-router-dom';
 import Planner from './components/Planner';
@@ -790,8 +791,13 @@ const BottomNavBar: React.FC = () => {
                         to={item.to}
                         className={({ isActive }) => `relative flex flex-col items-center justify-center w-full text-xs font-medium text-gray-400 hover:text-brand-amber-400 transition-all duration-300 pt-1 group ${isActive ? 'text-brand-amber-400' : ''}`}
                     >
-                        <item.icon className="w-6 h-6 mb-1 transition-transform group-hover:scale-110" /> {item.label}
-                        {({ isActive }) => isActive && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-brand-amber-400 rounded-full shadow-glow-amber-xs"></div>}
+                        {/* FIX: Wrap NavLink children in a render prop function to correctly handle active state. */}
+                        {({ isActive }) => (
+                            <>
+                                <item.icon className="w-6 h-6 mb-1 transition-transform group-hover:scale-110" /> {item.label}
+                                {isActive && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-brand-amber-400 rounded-full shadow-glow-amber-xs"></div>}
+                            </>
+                        )}
                     </NavLink>
                 ))}
             </div>
@@ -1268,17 +1274,16 @@ const App: React.FC = () => {
         db.transaction('rw', db.tasks, async () => {
              if (taskToFinalize) { // New task from TestPlanner
                 const performanceSummary = generatePerformanceSummary(difficulty, undefined, undefined, duration);
-                // FIX: Object literal may only specify known properties, and 'id' does not exist in type 'Omit<Task, "id">'.
-                // The original logic was incorrect. A new Task needs a unique ID to be added to the database.
-                const finalTask: Task = {
-                    ...taskToFinalize.task,
-                    id: crypto.randomUUID(),
+                // FIX: Destructure 'id' out to ensure it's not part of the spread, satisfying the Omit<Task, 'id'> type.
+                const { id: _, ...taskData } = taskToFinalize.task;
+                const finalTask: Omit<Task, 'id'> = {
+                    ...taskData,
                     status: 'Completed',
                     difficulty,
                     notes: (taskToFinalize.task.notes || '') + performanceSummary,
                     sessions: [{ date: new Date().toISOString(), duration }],
                 };
-                const newTaskId = await db.tasks.add(finalTask);
+                const newTaskId = await db.tasks.add({ ...finalTask, id: crypto.randomUUID()});
                 
                 if (originalTask.taskType === 'Lecture') {
                     await createSpacedRevisionTasks(originalTask, newTaskId as string);
@@ -1393,11 +1398,10 @@ const App: React.FC = () => {
 
         if (taskToFinalize) { // New task from TestPlanner timer
             const performanceSummary = generatePerformanceSummary(undefined, total, correct, duration, incorrectCount);
-             // FIX: Object literal may only specify known properties, and 'id' does not exist in type 'Omit<Task, "id">'.
-             // The original logic was incorrect. A new Task needs a unique ID to be added to the database.
-             const finalTask: Task = {
-                ...taskToFinalize.task,
-                id: crypto.randomUUID(),
+             // FIX: Destructure 'id' out to ensure it's not part of the spread, satisfying the Omit<Task, 'id'> type.
+             const { id: _, ...taskData } = taskToFinalize.task;
+             const finalTask: Omit<Task, 'id'> = {
+                ...taskData,
                 status: 'Completed',
                 totalQuestions: total,
                 correctAnswers: correct,
@@ -1405,7 +1409,7 @@ const App: React.FC = () => {
                 notes: (taskToFinalize.task.notes || '') + performanceSummary,
                 sessions: [{ date: new Date().toISOString(), duration: duration }],
             };
-            db.tasks.add(finalTask);
+            db.tasks.add({ ...finalTask, id: crypto.randomUUID()});
 
             const testNameMatch = taskToFinalize.task.notes?.match(/For upcoming test: "([^"]+)"/);
             if (testNameMatch) {
@@ -1456,7 +1460,7 @@ const App: React.FC = () => {
     const completionTaskDuration = taskToFinalize 
         ? taskToFinalize.duration 
         : taskToComplete 
-            ? (taskToComplete.sessions || []).reduce((sum, s) => sum + s.duration, 0)
+            ? (taskToComplete.sessions || []).reduce((sum: number, s: StudySession) => sum + s.duration, 0)
             : 0;
 
     const closeCompletionModals = () => {
