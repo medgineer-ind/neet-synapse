@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Link, useLocation } from 'react-router-dom';
 import Planner from './components/Planner';
@@ -838,6 +840,23 @@ const ConfirmSessionModal: React.FC<{
     );
 };
 
+const SimpleCompletionModal: React.FC<{
+    task: Task | null;
+    onConfirm: () => void;
+    onClose: () => void;
+}> = ({ task, onConfirm, onClose }) => {
+    if (!task) return null;
+    return (
+        <Modal isOpen={!!task} onClose={onClose} title={`Complete Task: ${task.name}`}>
+            <p className="mb-4">Mark this task as completed?</p>
+            <div className="flex justify-end gap-2">
+                <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                <Button onClick={onConfirm}>Complete</Button>
+            </div>
+        </Modal>
+    )
+}
+
 const CompleteLectureModal: React.FC<{ 
     task: Task | null; 
     initialDuration: number;
@@ -935,109 +954,6 @@ const CompletePracticeModal: React.FC<{
     );
 };
 
-const SpacedRevisionModal: React.FC<{
-    task: Task | null;
-    onClose: () => void;
-    onComplete: (revisionTask: Task, duration: number, difficulty: number, notes: string) => void;
-}> = ({ task, onClose, onComplete }) => {
-    // 0 = Notes, 0.1 = Rev/HW, 4 = 4th Day, 9 = 9th Day, 15 = 15th Day
-    const targetTimes: { [key: number]: number } = { 0: 60 * 60, 1: 20 * 60, 3: 45 * 60, 4: 15 * 60, 7: 30 * 60, 9: 45 * 60, 15: 30 * 60 };
-    // Default to 15 mins if not found
-    const targetDuration = (task?.revisionDay !== undefined) ? (targetTimes[task.revisionDay] || 900) : 0;
-
-    const [time, setTime] = useState(0);
-    const [isActive, setIsActive] = useState(true);
-    const [difficulty, setDifficulty] = useState(3);
-    const [notes, setNotes] = useState('');
-
-    useEffect(() => {
-        let interval: ReturnType<typeof setInterval> | null = null;
-        if (isActive) {
-            interval = setInterval(() => {
-                setTime(prevTime => prevTime + 1);
-            }, 1000);
-        } else if (!isActive && time !== 0) {
-            clearInterval(interval!);
-        }
-        return () => clearInterval(interval!);
-    }, [isActive, time]);
-    
-    useEffect(() => {
-        setTime(0);
-        setIsActive(true);
-        setDifficulty(3);
-        setNotes('');
-    }, [task]);
-
-    if (!task) return null;
-    
-    const timeRemaining = targetDuration - time;
-    const isOverTime = timeRemaining < 0;
-    const urgencyThreshold = targetDuration * 0.2; // 20% remaining
-    const isUrgent = !isOverTime && timeRemaining <= urgencyThreshold;
-
-    const displayTime = isOverTime ? `+${formatDuration(time - targetDuration)}` : formatDuration(timeRemaining);
-
-    const modalBorderClass = isOverTime 
-        ? 'border-red-500/80 shadow-glow-amber-lg animate-pulseGlow' 
-        : isUrgent 
-        ? 'border-yellow-500/80 animate-pulseGlow' 
-        : 'border-brand-amber-400/20';
-
-    const handleComplete = () => {
-        setIsActive(false);
-        onComplete(task, time, difficulty, notes);
-    };
-
-    return (
-        <Modal isOpen={!!task} onClose={onClose} title={`Grab It Completely`} maxWidth="max-w-xl">
-             <div className={cn("relative bg-slate-900/80 backdrop-blur-2xl border-2 rounded-lg p-6 w-full my-4 transition-all duration-500", modalBorderClass)}>
-                <h3 className="font-semibold text-gray-200 text-center text-lg mb-4 truncate" title={task.name}>{task.name}</h3>
-                <div className="text-center">
-                    <p className="font-display text-lg text-gray-400">Target Time: {formatDuration(targetDuration)}</p>
-                    <p className="font-display font-bold text-7xl my-4 tracking-wider">{displayTime}</p>
-                    {isOverTime && <p className="text-red-400 font-bold text-lg animate-fadeIn">DANGER: TIME OVER LIMIT!</p>}
-                    {isUrgent && <p className="text-yellow-400 font-bold text-lg animate-fadeIn">HURRY UP!</p>}
-                </div>
-
-                <div className="my-6">
-                    <label className="block mb-2 font-display text-lg text-center">How difficult did you feel instantly?</label>
-                    <div className="flex items-center gap-4 my-4">
-                        <span className="text-sm text-gray-400">Easy</span>
-                        <input type="range" min="1" max="5" value={difficulty} onChange={e => setDifficulty(Number(e.target.value))} className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer range-lg accent-brand-amber-500" />
-                        <span className="text-sm text-gray-400">Hard</span>
-                        <span className="font-bold text-brand-amber-400 text-2xl w-8 text-center">{difficulty}</span>
-                    </div>
-                </div>
-
-                {task.notes && (
-                    <div className="my-6">
-                        <label className="block mb-2 font-display text-lg text-center">Notes from Previous Revisions</label>
-                        <div className="max-h-24 overflow-y-auto p-3 bg-black/30 rounded-md text-sm text-gray-300 whitespace-pre-wrap font-mono">
-                            {task.notes}
-                        </div>
-                    </div>
-                )}
-
-                <div className="my-6">
-                    <label className="block mb-2 font-display text-lg text-center">Add Notes for this Revision</label>
-                    <Textarea
-                        value={notes}
-                        onChange={e => setNotes(e.target.value)}
-                        placeholder="e.g., Found a tricky concept, need to review again..."
-                        rows={3}
-                    />
-                </div>
-
-                <div className="flex justify-center gap-4 mt-6">
-                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleComplete} className="bg-brand-amber-500 text-brand-amber-900 hover:bg-brand-amber-400 focus:ring-brand-amber-500 shadow-glow-amber">Finish Revision</Button>
-                </div>
-            </div>
-        </Modal>
-    )
-};
-
 
 const App: React.FC = () => {
     const tasks = useLiveQuery(() => db.tasks.orderBy('date').toArray(), []);
@@ -1046,14 +962,16 @@ const App: React.FC = () => {
     const activeTimer = useLiveQuery(() => getMiscItem<ActiveTimer | null>('activeTimer', null), null);
     const activeBreak = useLiveQuery(() => getMiscItem<ActiveBreak | null>('activeBreak', null), null);
     const [targetScore, setTargetScore] = useState(680);
-    const [targetDate, setTargetDate] = useState('');
 
     const [timerSetup, setTimerSetup] = useState<{ task?: Task; test?: TestPlan } | null>(null);
     const [taskToComplete, setTaskToComplete] = useState<Task | null>(null);
     const [taskToFinalize, setTaskToFinalize] = useState<{ task: Task; duration: number } | null>(null);
     const [sessionToConfirm, setSessionToConfirm] = useState<{ task: Task; duration: number } | null>(null);
     const [completedTestInfo, setCompletedTestInfo] = useState<{ test: TestPlan, duration: number } | null>(null);
-    const [revisingTask, setRevisingTask] = useState<Task | null>(null);
+    
+    // New: Handle simple "Notes" completion
+    const [noteTaskToComplete, setNoteTaskToComplete] = useState<Task | null>(null);
+
     const { usagePercentage, refreshUsage } = useStorageUsage();
     
     const [isBreakModalOpen, setIsBreakModalOpen] = useState(false);
@@ -1075,7 +993,6 @@ const App: React.FC = () => {
 
     useEffect(() => {
         getMiscItem('targetScore', 680).then(setTargetScore);
-        getMiscItem('targetDate', '').then(setTargetDate);
     }, []);
 
     const handleSetTargetScore = (score: number) => {
@@ -1269,15 +1186,92 @@ const App: React.FC = () => {
     };
 
     // --- Task Completion Logic ---
+
+    const createPostLectureWorkflow = async (originalTask: Task, sourceTaskId: string | number) => {
+        // Logic to create 5 specific follow-up tasks
+        const todayStr = originalTask.date; // Use original planned date or today? Let's use the task's date to keep schedule aligned.
+        const dateObj = new Date(todayStr);
+
+        const getOffsetDate = (days: number) => {
+            const d = new Date(dateObj);
+            d.setDate(d.getDate() + days);
+            return d.toISOString().split('T')[0];
+        };
+
+        const newTasks: Omit<Task, "id">[] = [
+            {
+                name: `Notes: ${originalTask.name}`,
+                subject: originalTask.subject,
+                chapter: originalTask.chapter,
+                microtopics: originalTask.microtopics,
+                taskType: 'Notes',
+                date: todayStr, // Same day
+                status: 'Pending',
+                priority: 'High',
+                sessions: [],
+                sourceLectureTaskId: sourceTaskId as string,
+            },
+            {
+                name: `Revision & HW: ${originalTask.name}`,
+                subject: originalTask.subject,
+                chapter: originalTask.chapter,
+                microtopics: originalTask.microtopics,
+                taskType: 'RevisionHW',
+                date: todayStr, // Same day
+                status: 'Pending',
+                priority: 'High',
+                sessions: [],
+                sourceLectureTaskId: sourceTaskId as string,
+            },
+            {
+                name: `4th Day Revision: ${originalTask.name}`,
+                subject: originalTask.subject,
+                chapter: originalTask.chapter,
+                microtopics: originalTask.microtopics,
+                taskType: 'Revision4th',
+                date: getOffsetDate(4),
+                status: 'Pending',
+                priority: 'Medium',
+                sessions: [],
+                sourceLectureTaskId: sourceTaskId as string,
+            },
+            {
+                name: `7th Day Practice: ${originalTask.name}`,
+                subject: originalTask.subject,
+                chapter: originalTask.chapter,
+                microtopics: originalTask.microtopics,
+                taskType: 'Practice7th',
+                date: getOffsetDate(7),
+                status: 'Pending',
+                priority: 'Medium',
+                sessions: [],
+                sourceLectureTaskId: sourceTaskId as string,
+            },
+            {
+                name: `9th Day Practice: ${originalTask.name}`,
+                subject: originalTask.subject,
+                chapter: originalTask.chapter,
+                microtopics: originalTask.microtopics,
+                taskType: 'Practice9th',
+                date: getOffsetDate(9),
+                status: 'Pending',
+                priority: 'Medium',
+                sessions: [],
+                sourceLectureTaskId: sourceTaskId as string,
+            },
+        ];
+
+        await db.tasks.bulkAdd(newTasks.map(t => ({...t, id: crypto.randomUUID()})));
+    };
+
     const handleCompleteLecture = (difficulty: number, duration: number) => {
         if (!taskToComplete) return;
 
         const originalTask = taskToComplete;
 
         db.transaction('rw', db.tasks, async () => {
-             if (taskToFinalize) { // New task from TestPlanner
+             if (taskToFinalize) { // New task from TestPlanner or Timer
                 const performanceSummary = generatePerformanceSummary(difficulty, undefined, undefined, duration);
-                // FIX: Destructure 'id' out to ensure it's not part of the spread, satisfying the Omit<Task, 'id'> type.
                 const { id: _, ...taskData } = taskToFinalize.task;
                 const finalTask: Omit<Task, 'id'> = {
                     ...taskData,
@@ -1289,7 +1283,7 @@ const App: React.FC = () => {
                 const newTaskId = await db.tasks.add({ ...finalTask, id: crypto.randomUUID()});
                 
                 if (originalTask.taskType === 'Lecture') {
-                    await createSpacedRevisionTasks(originalTask, newTaskId as string);
+                    await createPostLectureWorkflow(originalTask, newTaskId as string);
                 }
 
             } else { // Existing task from Planner
@@ -1300,11 +1294,11 @@ const App: React.FC = () => {
                     status: 'Completed',
                     difficulty,
                     notes: updatedNotes,
-                    sessions: [{ date: originalTask.date, duration }]
+                    sessions: [{ date: new Date().toISOString(), duration }] // Use current time for completion
                 });
 
                 if (originalTask.taskType === 'Lecture') {
-                     await createSpacedRevisionTasks(originalTask, originalTask.id);
+                     await createPostLectureWorkflow(originalTask, originalTask.id);
                 }
             }
         });
@@ -1313,91 +1307,14 @@ const App: React.FC = () => {
         setTaskToFinalize(null);
     };
 
-    const createSpacedRevisionTasks = async (originalTask: Task, sourceTaskId: string | number) => {
-        // Standard 6-Step Workflow
-        const workflow = [
-            { offset: 0, type: 'Notes' as TaskType, namePrefix: 'Step 2: Notes' },
-            { offset: 0, type: 'Revision' as TaskType, namePrefix: 'Step 3: Rev & HW' },
-            { offset: 4, type: 'Revision' as TaskType, namePrefix: 'Step 4: 4th Day Rev' },
-            { offset: 9, type: 'Practice' as TaskType, namePrefix: 'Step 5: 9th Day Prac' },
-            { offset: 15, type: 'Practice' as TaskType, namePrefix: 'Step 6: 15th Day Prac' },
-        ];
-        
-        // Check for existing tasks to avoid duplicates
-        const existingRevisions = await db.tasks.where({ sourceLectureTaskId: sourceTaskId as string }).toArray();
-        const existingTypesAndDays = new Set(existingRevisions.map(t => `${t.taskType}-${t.revisionDay}`));
-
-        const newTasks: Omit<Task, "id">[] = workflow
-            .filter(step => !existingTypesAndDays.has(`${step.type}-${step.offset}`))
-            .map(step => {
-                const revisionDate = new Date();
-                revisionDate.setDate(revisionDate.getDate() + step.offset);
-                return {
-                    name: `${step.namePrefix} for "${originalTask.name}"`,
-                    subject: originalTask.subject,
-                    chapter: originalTask.chapter,
-                    microtopics: originalTask.microtopics,
-                    taskType: step.type,
-                    date: revisionDate.toISOString().split('T')[0],
-                    status: 'Pending',
-                    priority: step.offset <= 1 ? 'High' : 'Medium',
-                    sessions: [],
-                    sourceLectureTaskId: sourceTaskId as string,
-                    revisionDay: step.offset,
-                };
-            });
-        
-        if (newTasks.length > 0) {
-            await db.tasks.bulkAdd(newTasks.map(t => ({...t, id: crypto.randomUUID()})));
-        }
-    };
-
-    const handleCompleteRevision = (revisionTask: Task, duration: number, difficulty: number, notes: string) => {
-        db.transaction('rw', db.tasks, async () => {
-            // Update original lecture task with revision history
-            const originalLectureTask = await db.tasks.get(revisionTask.sourceLectureTaskId!);
-            if (originalLectureTask) {
-                const newAttempt: RevisionAttempt = {
-                    revisionDay: revisionTask.revisionDay!,
-                    date: new Date().toISOString(),
-                    duration,
-                    difficulty,
-                    notes: notes,
-                };
-                await db.tasks.update(originalLectureTask.id, {
-                    revisionHistory: [...(originalLectureTask.revisionHistory || []), newAttempt]
-                });
-            }
-
-            // Update the revision task itself to be completed
-            const currentNotes = revisionTask.notes || '';
-            const newNotesEntry = notes.trim() ? `\n\n--- My Notes for Day ${revisionTask.revisionDay} ---\n${notes}` : '';
-            await db.tasks.update(revisionTask.id, {
-                status: 'Completed',
-                sessions: [{ date: new Date().toISOString(), duration }],
-                difficulty,
-                notes: currentNotes + newNotesEntry,
-            });
-
-            // Carry over notes logic
-            if (notes.trim() && revisionTask.revisionDay !== undefined) {
-                // Find next logical step
-                const nextRevisionTask = await db.tasks
-                    .where({ sourceLectureTaskId: revisionTask.sourceLectureTaskId })
-                    .filter(t => t.revisionDay! > revisionTask.revisionDay!)
-                    .first();
-
-                if (nextRevisionTask) {
-                    const notesHeader = `\n\n--- Notes from Day ${revisionTask.revisionDay} Revision ---\n`;
-                    const newNotes = notesHeader + notes;
-                    await db.tasks.update(nextRevisionTask.id, {
-                        notes: (nextRevisionTask.notes || '') + newNotes
-                    });
-                }
-            }
+    const handleCompleteSimpleTask = () => {
+        if (!noteTaskToComplete) return;
+        db.tasks.update(noteTaskToComplete.id, {
+            status: 'Completed',
+            sessions: [{ date: new Date().toISOString(), duration: 0 }] // Minimal duration for simple tasks
         });
-        setRevisingTask(null);
-    };
+        setNoteTaskToComplete(null);
+    }
 
     const handleCompletePractice = (total: number, correct: number, duration: number, incorrectCount: number) => {
         if (!taskToComplete) return;
@@ -1455,7 +1372,7 @@ const App: React.FC = () => {
                 correctAnswers: correct,
                 incorrectAnswers: incorrectCount,
                 notes: updatedNotes,
-                sessions: [{ date: taskToComplete.date, duration }]
+                sessions: [{ date: new Date().toISOString(), duration }]
             });
         }
 
@@ -1546,6 +1463,15 @@ const App: React.FC = () => {
         );
     };
 
+    // Dispatcher for completing tasks based on type
+    const onCompleteTaskDispatch = (task: Task) => {
+        if (task.taskType === 'Notes') {
+            setNoteTaskToComplete(task);
+        } else {
+            setTaskToComplete(task);
+        }
+    };
+
     if (tasks === undefined || testPlans === undefined || activeTimer === undefined || activeBreak === undefined) {
         return (
             <div className="flex items-center justify-center min-h-screen text-gray-200 bg-slate-950">
@@ -1567,8 +1493,7 @@ const App: React.FC = () => {
                         <Planner 
                             activeTimer={activeTimer}
                             startTimer={startTaskTimer}
-                            onCompleteTask={setTaskToComplete}
-                            onStartRevision={setRevisingTask}
+                            onCompleteTask={onCompleteTaskDispatch}
                         />
                     } />
                     <Route path="/test-planner" element={
@@ -1593,7 +1518,7 @@ const App: React.FC = () => {
                     } />
                     <Route path="/self-tracker" element={<SelfTracker tasks={tasks} testPlans={testPlans} />} />
                     <Route path="/insights" element={<Insights tasks={tasks} testPlans={testPlans} targetScore={targetScore} />} />
-                    <Route path="/dashboard" element={<Dashboard targetDate={targetDate} />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/settings" element={<Settings />} />
                 </Routes>
             </main>
@@ -1697,22 +1622,23 @@ const App: React.FC = () => {
                 }}
             />
 
+            <SimpleCompletionModal
+                task={noteTaskToComplete}
+                onClose={() => setNoteTaskToComplete(null)}
+                onConfirm={handleCompleteSimpleTask}
+            />
+
             <CompleteLectureModal 
-                task={taskToComplete && (taskToComplete.taskType === 'Lecture' || taskToComplete.taskType === 'Revision') ? taskToComplete : null}
+                task={taskToComplete && ['Lecture', 'Revision', 'RevisionHW', 'Revision4th'].includes(taskToComplete.taskType) ? taskToComplete : null}
                 initialDuration={completionTaskDuration}
                 onComplete={handleCompleteLecture}
                 onClose={closeCompletionModals}
             />
             <CompletePracticeModal 
-                task={taskToComplete && taskToComplete.taskType === 'Practice' ? taskToComplete : null}
+                task={taskToComplete && ['Practice', 'Practice7th', 'Practice9th'].includes(taskToComplete.taskType) ? taskToComplete : null}
                 initialDuration={completionTaskDuration}
                 onComplete={handleCompletePractice}
                 onClose={closeCompletionModals}
-            />
-            <SpacedRevisionModal
-                task={revisingTask}
-                onClose={() => setRevisingTask(null)}
-                onComplete={handleCompleteRevision}
             />
             
             <GenerateReportModal isOpen={isGenerateReportModalOpen} onClose={() => setIsGenerateReportModalOpen(false)} />

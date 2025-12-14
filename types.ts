@@ -1,7 +1,7 @@
 
 // This file defines the core data structures and types used throughout the application.
 export type SubjectName = 'Physics' | 'Chemistry' | 'Botany' | 'Zoology';
-export type TaskType = 'Lecture' | 'Revision' | 'Practice' | 'SpacedRevision' | 'Notes';
+export type TaskType = 'Lecture' | 'Revision' | 'Practice' | 'Notes' | 'RevisionHW' | 'Revision4th' | 'Practice7th' | 'Practice9th' | 'SpacedRevision'; // Kept SpacedRevision temporarily for backward compat if needed, but logic removes it.
 export type TaskStatus = 'Pending' | 'Completed';
 export type Theme = 'light' | 'dark';
 export type Priority = 'Low' | 'Medium' | 'High';
@@ -66,7 +66,7 @@ export interface Task {
   originalDate?: string;
   sessions: StudySession[];
   sourceLectureTaskId?: string;
-  revisionDay?: number; // 0 (same day), 4, 9, 15 etc.
+  revisionDay?: number; // Legacy: 3, 5, 7, 15, 30
   revisionHistory?: RevisionAttempt[];
 }
 
@@ -122,7 +122,7 @@ export interface SubjectStats {
   };
   totalTime: number;
   timeByCategory: {
-    [key in TaskType]: number;
+    [key in TaskType]?: number;
   };
   totalQuestions: number;
   totalCorrect: number;
@@ -139,7 +139,7 @@ export interface ProgressStats {
   };
   totalTimeStudied: number;
   timeByCategory: {
-    [key in TaskType]: number;
+    [key in TaskType]?: number;
   };
   totalQuestions: number;
   totalCorrect: number;

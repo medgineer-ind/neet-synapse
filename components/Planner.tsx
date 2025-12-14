@@ -232,7 +232,6 @@ const TaskForm: React.FC<{
                             <option value="Lecture">Lecture</option>
                             <option value="Revision">Revision</option>
                             <option value="Practice">Practice</option>
-                            <option value="Notes">Notes</option>
                         </Select>
                     </div>
                     <div>
@@ -264,18 +263,36 @@ const TaskForm: React.FC<{
 // --- Task Item Sub-components ---
 
 const TaskTypeTag: React.FC<{ type: TaskType }> = ({ type }) => {
-    const typeStyles: Record<TaskType, { icon: React.ReactElement; className: string }> = {
+    const typeStyles: Record<string, { icon: React.ReactElement; className: string }> = {
         Lecture: { icon: <BookOpenIcon className="w-4 h-4" />, className: "bg-brand-amber-900/50 text-brand-amber-300 border-brand-amber-700" },
         Revision: { icon: <RepeatIcon className="w-4 h-4" />, className: "bg-green-900/50 text-green-300 border-green-700" },
         Practice: { icon: <TargetIcon className="w-4 h-4" />, className: "bg-brand-orange-900/50 text-brand-orange-400 border-brand-orange-700" },
-        SpacedRevision: { icon: <BrainCircuitIcon className="w-4 h-4" />, className: "bg-cyan-900/50 text-cyan-300 border-cyan-700" },
-        Notes: { icon: <StickyNoteIcon className="w-4 h-4" />, className: "bg-indigo-900/50 text-indigo-300 border-indigo-700" },
+        Notes: { icon: <StickyNoteIcon className="w-4 h-4" />, className: "bg-slate-700/50 text-slate-300 border-slate-600" },
+        RevisionHW: { icon: <RepeatIcon className="w-4 h-4" />, className: "bg-teal-900/50 text-teal-300 border-teal-700" },
+        Revision4th: { icon: <RepeatIcon className="w-4 h-4" />, className: "bg-cyan-900/50 text-cyan-300 border-cyan-700" },
+        Practice7th: { icon: <TargetIcon className="w-4 h-4" />, className: "bg-violet-900/50 text-violet-300 border-violet-700" },
+        Practice9th: { icon: <TargetIcon className="w-4 h-4" />, className: "bg-pink-900/50 text-pink-300 border-pink-700" },
+        SpacedRevision: { icon: <BrainCircuitIcon className="w-4 h-4" />, className: "bg-cyan-900/50 text-cyan-300 border-cyan-700" }, // Fallback
     };
-    const { icon, className } = typeStyles[type];
+    
+    // Handle fallback if type not found (shouldn't happen with updated types but safe)
+    const style = typeStyles[type] || typeStyles['Revision'];
+    
+    const labels: Record<string, string> = {
+        Lecture: 'Lecture',
+        Revision: 'Revision',
+        Practice: 'Practice',
+        Notes: 'Notes',
+        RevisionHW: 'Rev & HW',
+        Revision4th: '4th Day Rev',
+        Practice7th: '7th Day Prac',
+        Practice9th: '9th Day Prac',
+    };
+
     return (
-        <span className={cn("flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full border", className)}>
-            {icon}
-            {type === 'SpacedRevision' ? 'Spaced Rev.' : type}
+        <span className={cn("flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full border", style.className)}>
+            {style.icon}
+            {labels[type] || type}
         </span>
     );
 };
@@ -288,20 +305,18 @@ const TaskItem: React.FC<{
     onDeleteTask: (id: string) => void; 
     onEditTask: (task: Task) => void; 
     onReschedule: (task: Task) => void;
-    onStartRevision: (task: Task) => void;
     isForTest: boolean;
     startTimer: (task: Task) => void;
     activeTimer: ActiveTimer | null;
-}> = ({ task, onCompleteTask, onDeleteTask, onEditTask, onReschedule, onStartRevision, isForTest, startTimer, activeTimer }) => {
+}> = ({ task, onCompleteTask, onDeleteTask, onEditTask, onReschedule, isForTest, startTimer, activeTimer }) => {
     const [isExpanded, setExpanded] = useState(false);
     const isTimerActiveForThisTask = activeTimer?.task?.id === task.id;
     const totalDuration = useMemo(() => (task.sessions || []).reduce((sum, s) => sum + s.duration, 0), [task.sessions]);
     
-    // Fetch associated tasks for the 6-step workflow
-    const associatedRevisionTasks = useLiveQuery(
+    const linkedTasks = useLiveQuery(
         () => task.taskType === 'Lecture' && task.status === 'Completed'
             ? db.tasks.where({ sourceLectureTaskId: task.id as string }).toArray()
-            : Promise.resolve([]), // Return a resolved promise with an empty array if not applicable
+            : Promise.resolve([]),
         [task.id, task.taskType, task.status]
     );
 
@@ -311,61 +326,21 @@ const TaskItem: React.FC<{
         Low: "border-l-blue-500",
     };
 
-    const revisionDetails = useMemo(() => {
-        if (task.taskType !== 'Lecture' || task.status !== 'Completed' || !associatedRevisionTasks) {
-            return [];
-        }
-
-        // Custom 6-Step Workflow Logic
-        // We look for tasks generated from this lecture based on revisionDay
-        // revisionDay 0 = Notes (Step 2) AND Rev/HW (Step 3)
-        // revisionDay 4 = Step 4
-        // revisionDay 9 = Step 5
-        // revisionDay 15 = Step 6
-
-        const workflowSteps = [
-            { day: 0, type: 'Notes' as TaskType, label: 'Step 2: Notes' },
-            { day: 0, type: 'Revision' as TaskType, label: 'Step 3: Rev & HW' },
-            { day: 4, type: 'Revision' as TaskType, label: 'Step 4: 4th Day Rev' },
-            { day: 9, type: 'Practice' as TaskType, label: 'Step 5: 9th Day Prac' },
-            { day: 15, type: 'Practice' as TaskType, label: 'Step 6: 15th Day Prac' },
-        ];
+    const workflowSteps = useMemo(() => {
+        if (!linkedTasks) return [];
+        // Sort specifically for display
+        const orderMap: Record<string, number> = {
+            'Notes': 1,
+            'RevisionHW': 2,
+            'Revision4th': 3,
+            'Practice7th': 4,
+            'Practice9th': 5
+        };
         
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        return linkedTasks.sort((a,b) => (orderMap[a.taskType] || 99) - (orderMap[b.taskType] || 99));
+    }, [linkedTasks]);
 
-        return workflowSteps.map(step => {
-            // Find the specific task for this step
-            const existingTask = associatedRevisionTasks.find(t => 
-                t.revisionDay === step.day && t.taskType === step.type
-            );
-
-            // Check if completed in revisionHistory (legacy or for future proofing) OR if the task itself is completed
-            const completedInHistory = task.revisionHistory?.find(rev => rev.revisionDay === step.day); // Note: Day 0 history might be ambiguous, but usually tied to task completion
-            
-            if (existingTask) {
-                const taskDate = new Date(new Date(existingTask.date).toLocaleString("en-US", { timeZone: "UTC" }));
-                if (existingTask.status === 'Completed') {
-                     return {
-                        stepLabel: step.label,
-                        status: 'Completed' as const,
-                        data: existingTask, // Use the task itself as data
-                        completionDate: existingTask.sessions && existingTask.sessions.length > 0 ? existingTask.sessions[0].date : existingTask.date
-                    };
-                } else {
-                     return {
-                        stepLabel: step.label,
-                        status: taskDate < today ? 'Overdue' as const : 'Pending' as const,
-                        data: existingTask,
-                    };
-                }
-            }
-            
-            return null;
-        }).filter(Boolean);
-    }, [task, associatedRevisionTasks]);
-
-    const hasDetails = task.notes || task.originalDate || (task.taskType === 'Lecture' && revisionDetails.length > 0);
+    const hasDetails = task.notes || task.originalDate || (task.taskType === 'Lecture' && workflowSteps.length > 0);
 
     return (
         <div className={cn(
@@ -396,26 +371,18 @@ const TaskItem: React.FC<{
                 <div className="flex items-center gap-1 self-end sm:self-center flex-shrink-0 transition-opacity duration-300 lg:opacity-0 lg:group-hover:opacity-100">
                     {task.status === 'Pending' ? (
                         <>
-                            {task.taskType === 'SpacedRevision' ? ( // Legacy check, mostly won't be used with new flow but safe to keep
-                                <Button onClick={() => onStartRevision(task)} variant="secondary" size="sm" className="bg-cyan-500/10 text-cyan-300 border-cyan-500/20 hover:bg-cyan-500/20">
-                                    <BrainCircuitIcon className="w-4 h-4" /> Start Revision
+                            <Button onClick={() => onCompleteTask(task)} variant="secondary" size="sm">Complete</Button>
+                            {!isTimerActiveForThisTask && (
+                                <Button 
+                                    onClick={() => startTimer(task)} 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="p-2" 
+                                    aria-label="Start timer"
+                                    disabled={!!activeTimer}
+                                >
+                                    <PlayIcon className="w-4 h-4"/>
                                 </Button>
-                            ) : (
-                                <>
-                                    <Button onClick={() => onCompleteTask(task)} variant="secondary" size="sm">Complete</Button>
-                                    {!isTimerActiveForThisTask && (
-                                        <Button 
-                                            onClick={() => startTimer(task)} 
-                                            variant="ghost" 
-                                            size="sm" 
-                                            className="p-2" 
-                                            aria-label="Start timer"
-                                            disabled={!!activeTimer}
-                                        >
-                                            <PlayIcon className="w-4 h-4"/>
-                                        </Button>
-                                    )}
-                                </>
                             )}
                         </>
                     ) : (
@@ -445,55 +412,42 @@ const TaskItem: React.FC<{
                 <div className="px-4 pb-4 border-t border-white/10 text-sm text-gray-300 space-y-2 animate-fadeIn">
                     {task.originalDate && <p><strong className="text-gray-400 font-display">Originally planned for:</strong> {new Date(new Date(task.originalDate).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString()}</p>}
                     {task.notes && <div><strong className="text-gray-400 font-display">Notes:</strong><p className="whitespace-pre-wrap pl-2 mt-1 font-mono text-xs">{task.notes}</p></div>}
-                    {task.taskType === 'Lecture' && revisionDetails.length > 0 && (
+                    
+                    {task.taskType === 'Lecture' && workflowSteps.length > 0 && (
                         <div className="pt-3 mt-3 border-t border-white/10">
-                            <strong className="text-gray-400 font-display">Lecture Progression:</strong>
+                            <strong className="text-gray-400 font-display">Post-Lecture Progress:</strong>
                             <div className="space-y-3 mt-2 pl-2">
-                                {revisionDetails.map(rev => {
-                                    if (!rev) return null;
-                                    const { stepLabel, status, data, completionDate } = rev;
+                                {workflowSteps.map(stepTask => {
+                                    const isCompleted = stepTask.status === 'Completed';
+                                    const taskDate = new Date(new Date(stepTask.date).toLocaleString("en-US", { timeZone: "UTC" }));
+                                    const isOverdue = !isCompleted && taskDate < new Date(new Date().setHours(0,0,0,0));
                                     
-                                    if (status === 'Completed') {
-                                        const taskData = data as Task;
-                                        return (
-                                            <div key={stepLabel} className="flex items-start gap-3 text-xs">
+                                    return (
+                                        <div key={stepTask.id} className="flex items-start gap-3 text-xs">
+                                            {isCompleted ? (
                                                 <CheckCircleIcon className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                                                <div>
-                                                    <p className="font-semibold text-gray-200">{stepLabel} - Completed <span className="text-gray-400 font-normal">on {new Date(completionDate!).toLocaleDateString()}</span></p>
-                                                    {taskData.difficulty && <p className="text-gray-400">Difficulty: <span className="font-semibold text-gray-300">{taskData.difficulty}/5</span></p>}
-                                                    {taskData.notes && <p className="mt-1 p-2 bg-black/30 rounded whitespace-pre-wrap font-mono text-gray-300">{taskData.notes}</p>}
-                                                </div>
-                                            </div>
-                                        )
-                                    }
-                                    
-                                    const taskData = data as Task;
-                                    const scheduledDate = new Date(new Date(taskData.date).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString();
-
-                                    if (status === 'Pending') {
-                                        return (
-                                            <div key={stepLabel} className="flex items-start gap-3 text-xs">
-                                                <ClockIcon className="w-4 h-4 text-brand-amber-400 flex-shrink-0 mt-0.5" />
-                                                <div>
-                                                    <p className="font-semibold text-gray-300">{stepLabel} - Pending</p>
-                                                    <p className="text-gray-400">Scheduled for {scheduledDate}</p>
-                                                </div>
-                                            </div>
-                                        )
-                                    }
-                                    
-                                    if (status === 'Overdue') {
-                                        return (
-                                             <div key={stepLabel} className="flex items-start gap-3 text-xs">
+                                            ) : isOverdue ? (
                                                 <AlertTriangleIcon className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-                                                <div>
-                                                    <p className="font-semibold text-red-300">{stepLabel} - Overdue</p>
-                                                    <p className="text-gray-400">Was scheduled for {scheduledDate}</p>
+                                            ) : (
+                                                <ClockIcon className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
+                                            )}
+                                            
+                                            <div className="flex-1">
+                                                <div className="flex justify-between">
+                                                    <span className={cn("font-semibold", isCompleted ? "text-green-300" : isOverdue ? "text-red-300" : "text-gray-300")}>
+                                                        {stepTask.name.replace(`: ${task.name}`, '')} 
+                                                    </span>
+                                                    <span className="text-gray-500">{new Date(stepTask.date).toLocaleDateString()}</span>
                                                 </div>
+                                                {isCompleted && (
+                                                    <div className="text-gray-400 mt-0.5">
+                                                        {stepTask.difficulty && <span>Diff: <strong className="text-gray-300">{stepTask.difficulty}/5</strong></span>}
+                                                        {stepTask.totalQuestions && <span> | Acc: <strong className="text-gray-300">{((stepTask.correctAnswers || 0) / stepTask.totalQuestions * 100).toFixed(0)}%</strong></span>}
+                                                    </div>
+                                                )}
                                             </div>
-                                        )
-                                    }
-                                    return null;
+                                        </div>
+                                    );
                                 })}
                             </div>
                         </div>
@@ -609,7 +563,6 @@ const EditTaskModal: React.FC<{ task: Task | null; onClose: () => void }> = ({ t
                             <option value="Lecture">Lecture</option>
                             <option value="Revision">Revision</option>
                             <option value="Practice">Practice</option>
-                            <option value="Notes">Notes</option>
                         </Select>
                     </div>
                     <div>
@@ -746,10 +699,9 @@ interface PlannerProps {
     activeTimer: ActiveTimer | null;
     startTimer: (task: Task) => void;
     onCompleteTask: (task: Task) => void;
-    onStartRevision: (task: Task) => void;
 }
 
-const Planner: React.FC<PlannerProps> = ({ activeTimer, startTimer, onCompleteTask, onStartRevision }) => {
+const Planner: React.FC<PlannerProps> = ({ activeTimer, startTimer, onCompleteTask }) => {
     const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
     const [taskToReschedule, setTaskToReschedule] = useState<Task | null>(null);
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -853,7 +805,6 @@ const Planner: React.FC<PlannerProps> = ({ activeTimer, startTimer, onCompleteTa
                                     <option value="Revision">Revision</option>
                                     <option value="Practice">Practice</option>
                                     <option value="Notes">Notes</option>
-                                    <option value="SpacedRevision">Spaced Revision</option>
                                 </Select>
                                  <Select value={filters.priority} onChange={e => setFilters(f => ({...f, priority: e.target.value as any}))}>
                                     <option value="All">All Priorities</option>
@@ -889,7 +840,6 @@ const Planner: React.FC<PlannerProps> = ({ activeTimer, startTimer, onCompleteTa
                                     onDeleteTask={handleDeleteTask} 
                                     onEditTask={setTaskToEdit} 
                                     onReschedule={setTaskToReschedule} 
-                                    onStartRevision={onStartRevision}
                                     isForTest={isTaskForTest(task)}
                                     startTimer={startTimer}
                                     activeTimer={activeTimer}

@@ -1,5 +1,6 @@
 
 
+
 import React, { useMemo, useState } from 'react';
 import { Task, TestPlan, TaskType, Priority, RevisionAttempt } from '../types';
 import { cn } from '../lib/utils';
@@ -30,18 +31,36 @@ interface TimelineProps {
 
 
 const TaskTypeTag: React.FC<{ type: TaskType }> = ({ type }) => {
-    const typeStyles: Record<TaskType, { icon: React.ReactElement; className: string }> = {
+    const typeStyles: Record<string, { icon: React.ReactElement; className: string }> = {
         Lecture: { icon: <BookOpenIcon className="w-4 h-4" />, className: "bg-brand-amber-900/50 text-brand-amber-300 border-brand-amber-700" },
         Revision: { icon: <RepeatIcon className="w-4 h-4" />, className: "bg-green-900/50 text-green-300 border-green-700" },
         Practice: { icon: <TargetIcon className="w-4 h-4" />, className: "bg-brand-orange-900/50 text-brand-orange-400 border-brand-orange-700" },
+        Notes: { icon: <StickyNoteIcon className="w-4 h-4" />, className: "bg-slate-700/50 text-slate-300 border-slate-600" },
+        RevisionHW: { icon: <RepeatIcon className="w-4 h-4" />, className: "bg-teal-900/50 text-teal-300 border-teal-700" },
+        Revision4th: { icon: <RepeatIcon className="w-4 h-4" />, className: "bg-cyan-900/50 text-cyan-300 border-cyan-700" },
+        Practice7th: { icon: <TargetIcon className="w-4 h-4" />, className: "bg-violet-900/50 text-violet-300 border-violet-700" },
+        Practice9th: { icon: <TargetIcon className="w-4 h-4" />, className: "bg-pink-900/50 text-pink-300 border-pink-700" },
         SpacedRevision: { icon: <BrainCircuitIcon className="w-4 h-4" />, className: "bg-cyan-900/50 text-cyan-300 border-cyan-700" },
-        Notes: { icon: <StickyNoteIcon className="w-4 h-4" />, className: "bg-indigo-900/50 text-indigo-300 border-indigo-700" },
     };
-    const { icon, className } = typeStyles[type];
+    
+    // Handle fallback if type not found (shouldn't happen with updated types but safe)
+    const style = typeStyles[type] || typeStyles['Revision'];
+    
+    const labels: Record<string, string> = {
+        Lecture: 'Lecture',
+        Revision: 'Revision',
+        Practice: 'Practice',
+        Notes: 'Notes',
+        RevisionHW: 'Rev & HW',
+        Revision4th: '4th Day Rev',
+        Practice7th: '7th Day Prac',
+        Practice9th: '9th Day Prac',
+    };
+
     return (
-        <span className={cn("flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full border", className)}>
-            {icon}
-            {type === 'SpacedRevision' ? 'Spaced Rev.' : type}
+        <span className={cn("flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full border", style.className)}>
+            {style.icon}
+            {labels[type] || type}
         </span>
     );
 };
@@ -118,141 +137,15 @@ const ShowCompletedToggle: React.FC<{ checked: boolean; onChange: (checked: bool
     </div>
 );
 
-const SpacedRevisionOutlook: React.FC<{ outlook: { overdue: RevisionStatusItem[], upcoming: RevisionStatusItem[] } }> = ({ outlook }) => {
-    const { overdue, upcoming } = outlook;
-
-    if (overdue.length === 0 && upcoming.length === 0) {
-        return null;
-    }
-
-    const upcomingGroupedByDate = upcoming.reduce((acc, item) => {
-        const dateStr = item.date.toDateString();
-        if (!acc[dateStr]) acc[dateStr] = [];
-        acc[dateStr].push(item);
-        return acc;
-    }, {} as Record<string, RevisionStatusItem[]>);
-
-    const statusStyles = {
-        Overdue: { icon: <AlertTriangleIcon className="w-4 h-4 text-red-400" />, text: "text-red-300", bg: "bg-red-900/30" },
-        Pending: { icon: <ClockIcon className="w-4 h-4 text-yellow-400" />, text: "text-yellow-300", bg: "bg-yellow-900/30" },
-        Completed: { icon: null, text: "", bg: "" },
-    };
-
-    const formatDateHeader = (dateString: string) => {
-        const date = new Date(dateString);
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        if (date.toDateString() === today.toDateString()) return "Today";
-        if (date.toDateString() === tomorrow.toDateString()) return "Tomorrow";
-        return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-    };
-
-    return (
-        <Card className="p-6 mb-8">
-            <h2 className="font-display text-2xl font-bold text-brand-amber-400 mb-4 tracking-wide flex items-center gap-3">
-                <BrainCircuitIcon className="w-7 h-7" /> Spaced Revision Outlook
-            </h2>
-            <div className="flex gap-4 mb-4">
-                <div className="flex-1 p-3 bg-red-900/20 rounded-lg text-center">
-                    <p className="font-display text-3xl font-bold text-red-300">{overdue.length}</p>
-                    <p className="text-xs text-red-400 font-semibold">Overdue</p>
-                </div>
-                 <div className="flex-1 p-3 bg-yellow-900/20 rounded-lg text-center">
-                    <p className="font-display text-3xl font-bold text-yellow-300">{upcoming.length}</p>
-                    <p className="text-xs text-yellow-400 font-semibold">Upcoming this week</p>
-                </div>
-            </div>
-            
-            <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                {overdue.length > 0 && (
-                    <div>
-                        <h3 className="font-display text-lg font-semibold text-red-300 mb-2">Action Required: Overdue</h3>
-                        <div className="space-y-2">
-                            {overdue.map(item => (
-                                <div key={item.id} className={cn("p-2 rounded-md flex justify-between items-center text-sm", statusStyles[item.status].bg)}>
-                                    <div>
-                                        <p className="font-semibold">{item.lectureName}</p>
-                                        <p className="text-xs text-gray-400">Day {item.revisionDay} Revision</p>
-                                    </div>
-                                    <div className={cn("flex items-center gap-1.5 text-xs font-semibold", statusStyles[item.status].text)}>
-                                        {statusStyles[item.status].icon}
-                                        Was due {item.date.toLocaleDateString()}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-                {/* FIX: Cast result of Object.entries to a typed array to resolve issue where .map was not found on type 'unknown'. */}
-                 {(Object.entries(upcomingGroupedByDate) as [string, RevisionStatusItem[]][]).map(([dateStr, items]) => (
-                    <div key={dateStr}>
-                        <h3 className="font-display text-lg font-semibold text-yellow-300 mb-2">{formatDateHeader(dateStr)}</h3>
-                        <div className="space-y-2">
-                             {items.map(item => (
-                                <div key={item.id} className={cn("p-2 rounded-md flex justify-between items-center text-sm", statusStyles[item.status].bg)}>
-                                    <div>
-                                        <p className="font-semibold">{item.lectureName}</p>
-                                        <p className="text-xs text-gray-400">Day {item.revisionDay} Revision</p>
-                                    </div>
-                                    <div className={cn("flex items-center gap-1.5 text-xs font-semibold", statusStyles[item.status].text)}>
-                                        {statusStyles[item.status].icon}
-                                        Pending
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                 ))}
-            </div>
-        </Card>
-    );
-};
-
 
 const Timeline: React.FC<TimelineProps> = ({ tasks, testPlans }) => {
     const [showCompleted, setShowCompleted] = useState(false);
 
-    const { overdueItems, todayItems, upcomingGrouped, completedTodayTasks, revisionOutlook } = useMemo(() => {
+    const { overdueItems, todayItems, upcomingGrouped, completedTodayTasks } = useMemo(() => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        
-        const outlookItems: RevisionStatusItem[] = [];
-        const completedLectures = tasks.filter(t => t.taskType === 'Lecture' && t.status === 'Completed');
-        const revisionTasks = tasks.filter(t => t.taskType === 'SpacedRevision' && t.status === 'Pending');
-
-        completedLectures.forEach(lecture => {
-            const REVISION_SCHEDULE = [3, 5, 7, 15, 30];
-            REVISION_SCHEDULE.forEach(day => {
-                const completedAttempt = lecture.revisionHistory?.find(h => h.revisionDay === day);
-                if (completedAttempt) return;
-
-                const scheduledTask = revisionTasks.find(rt => rt.sourceLectureTaskId === lecture.id && rt.revisionDay === day);
-                if (scheduledTask) {
-                    const taskDate = new Date(new Date(scheduledTask.date).toLocaleString("en-US", { timeZone: "UTC" }));
-                    const status = taskDate < today ? 'Overdue' : 'Pending';
-                    outlookItems.push({
-                        id: scheduledTask.id,
-                        lectureId: lecture.id,
-                        lectureName: lecture.name,
-                        revisionDay: day,
-                        status: status,
-                        date: taskDate,
-                        data: scheduledTask,
-                    });
-                }
-            });
-        });
-        
         const sevenDaysFromNow = new Date(today);
         sevenDaysFromNow.setDate(today.getDate() + 7);
-
-        const revisionOutlook = {
-            overdue: outlookItems.filter(item => item.status === 'Overdue').sort((a,b) => a.date.getTime() - b.date.getTime()),
-            upcoming: outlookItems.filter(item => item.status === 'Pending' && item.date >= today && item.date <= sevenDaysFromNow).sort((a,b) => a.date.getTime() - b.date.getTime())
-        };
 
         const allPendingItems: (Task | TestPlan)[] = [
             ...tasks.filter(task => task.status === 'Pending'),
@@ -307,7 +200,7 @@ const Timeline: React.FC<TimelineProps> = ({ tasks, testPlans }) => {
             })
             .sort((a,b) => (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3));
 
-        return { overdueItems, todayItems, upcomingGrouped, completedTodayTasks, revisionOutlook };
+        return { overdueItems, todayItems, upcomingGrouped, completedTodayTasks };
     }, [tasks, testPlans]);
 
     const formatDateHeader = (dateString: string) => {
@@ -346,8 +239,6 @@ const Timeline: React.FC<TimelineProps> = ({ tasks, testPlans }) => {
         <div className="max-w-4xl mx-auto">
             <h1 className="font-display text-4xl font-bold text-brand-amber-400 mb-8 tracking-wide">Agenda</h1>
             
-            <SpacedRevisionOutlook outlook={revisionOutlook} />
-
             <ShowCompletedToggle checked={showCompleted} onChange={setShowCompleted} />
 
             {!hasPendingItems && (!showCompleted || completedTodayTasks.length === 0) ? (

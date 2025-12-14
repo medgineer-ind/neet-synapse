@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import { Task, TestPlan, BreakSession, DailyLog } from '../types';
 import { formatDuration, calculateOverallScore, getScoreColorClass } from '../lib/utils';
@@ -21,9 +20,7 @@ function getWeekDateRange(weekString: string) {
         const now = new Date();
         return { startDate: now, endDate: now, weekNumber: 0, year: now.getFullYear() };
     }
-    const parts = weekString.split('-W');
-    const year = Number(parts[0]);
-    const week = Number(parts[1]);
+    const [year, week] = weekString.split('-W').map(Number);
     
     // Jan 4th is always in week 1
     const jan4 = new Date(Date.UTC(year, 0, 4));
@@ -58,22 +55,22 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ week, allTasks, allTestPlan
         const testsThisWeek = allTestPlans.filter(t => t.date >= startStr && t.date <= endStr && t.status === 'Completed');
         const breaksThisWeek = allBreakSessions.filter(b => {
             const bDate = new Date(b.date);
-            // Explicit numeric comparison to avoid TS error about arithmetic operations on dates
+            // FIX: Compare Date objects using .getTime() to ensure numeric comparison, preventing a TypeScript error.
             return bDate.getTime() >= startDate.getTime() && bDate.getTime() <= endDate.getTime();
         });
 
-        const totalStudyTime = completedTasks.reduce((sum: number, task) => sum + (task.sessions || []).reduce((sSum: number, s) => sSum + s.duration, 0), 0);
-        const totalBreakTime = breaksThisWeek.reduce((sum: number, b) => sum + b.duration, 0);
+        const totalStudyTime = completedTasks.reduce((sum, task) => sum + (task.sessions || []).reduce((sSum, s) => sSum + s.duration, 0), 0);
+        const totalBreakTime = breaksThisWeek.reduce((sum, b) => sum + b.duration, 0);
         const efficiencyScore = (totalStudyTime + totalBreakTime > 0) ? (totalStudyTime / (totalStudyTime + totalBreakTime)) * 100 : 0;
         
-        const avgMood = dailyLogsThisWeek && dailyLogsThisWeek.length > 0 ? dailyLogsThisWeek.reduce((sum: number, log) => sum + log.mood, 0) / dailyLogsThisWeek.length : 0;
-        const avgEnergy = dailyLogsThisWeek && dailyLogsThisWeek.length > 0 ? dailyLogsThisWeek.reduce((sum: number, log) => sum + log.energy, 0) / dailyLogsThisWeek.length : 0;
+        const avgMood = dailyLogsThisWeek && dailyLogsThisWeek.length > 0 ? dailyLogsThisWeek.reduce((sum, log) => sum + log.mood, 0) / dailyLogsThisWeek.length : 0;
+        const avgEnergy = dailyLogsThisWeek && dailyLogsThisWeek.length > 0 ? dailyLogsThisWeek.reduce((sum, log) => sum + log.energy, 0) / dailyLogsThisWeek.length : 0;
 
         const practiceStats = completedTasks.filter(t => t.taskType === 'Practice' && t.totalQuestions).reduce((acc, task) => {
             acc.attempted += task.totalQuestions!;
             acc.correct += task.correctAnswers || 0;
             return acc;
-        }, { attempted: 0, correct: 0 });
+        }, { attempted: 0, correct: 0 } as { attempted: number; correct: number });
 
         const chapterSummary = completedTasks.reduce((acc, task) => {
             const key = `${task.subject} > ${task.chapter}`;

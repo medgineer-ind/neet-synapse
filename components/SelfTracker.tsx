@@ -1,3 +1,5 @@
+
+
 import React, { useMemo } from 'react';
 import { Task, TestPlan, SubjectName, ProgressStats, ChapterStats, SubjectStats, MicrotopicStats, StudySession } from '../types';
 import { Card } from './ui/StyledComponents';
@@ -373,9 +375,9 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
                 revisionStreak = 1;
                 for (let i = perfectRevisionDays.length - 1; i > 0; i--) {
                     // FIX: Cast array element to string to satisfy new Date() constructor overload.
-                    const current = new Date(perfectRevisionDays[i] as string);
+                    const current = new Date(String(perfectRevisionDays[i]));
                     // FIX: Cast array element to string to satisfy new Date() constructor overload.
-                    const prev = new Date(perfectRevisionDays[i - 1] as string);
+                    const prev = new Date(String(perfectRevisionDays[i - 1]));
                     if ((current.getTime() - prev.getTime()) / (1000 * 3600 * 24) === 1) {
                         revisionStreak++;
                     } else {
@@ -405,8 +407,8 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
             if (completedDays.includes(today.toISOString().split('T')[0]) || completedDays.includes(yesterday.toISOString().split('T')[0])) {
                 completionStreak = 1;
                 for (let i = completedDays.length - 1; i > 0; i--) {
-                    const current = new Date(completedDays[i] as string);
-                    const prev = new Date(completedDays[i - 1] as string);
+                    const current = new Date(completedDays[i]);
+                    const prev = new Date(completedDays[i - 1]);
                     if ((current.getTime() - prev.getTime()) / (1000 * 3600 * 24) === 1) {
                         completionStreak++;
                     } else break;
@@ -427,8 +429,8 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
             if(studyDays.includes(todayStr) || studyDays.includes(yesterdayStr)) {
                 consistencyStreak = 1;
                 for (let i = studyDays.length - 1; i > 0; i--) {
-                    const current = new Date(studyDays[i] as string);
-                    const prev = new Date(studyDays[i - 1] as string);
+                    const current = new Date(studyDays[i]);
+                    const prev = new Date(studyDays[i - 1]);
                     if ((current.getTime() - prev.getTime()) / (1000 * 3600 * 24) === 1) {
                         consistencyStreak++;
                     } else {

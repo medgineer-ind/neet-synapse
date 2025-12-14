@@ -123,7 +123,7 @@ const createEmptyStats = () => ({
   totalSkipped: 0,
 });
 
-const emptyTimeByCategory = { Lecture: 0, Revision: 0, Practice: 0, SpacedRevision: 0, Notes: 0 };
+const emptyTimeByCategory = { Lecture: 0, Revision: 0, Practice: 0, Notes: 0, RevisionHW: 0, Revision4th: 0, Practice7th: 0, Practice9th: 0, SpacedRevision: 0 };
 
 export function calculateProgress(tasks: Task[]): ProgressStats {
   // Initialize the stats object with the full syllabus structure
@@ -180,8 +180,13 @@ export function calculateProgress(tasks: Task[]): ProgressStats {
 
         const totalDuration = (task.sessions || []).reduce((sum, s) => sum + s.duration, 0);
         
-        stats.timeByCategory[task.taskType] += totalDuration;
-        subject.timeByCategory[task.taskType] += totalDuration;
+        // Map new specific types to broader categories for stats if needed, or keep separate
+        if (stats.timeByCategory[task.taskType] !== undefined) {
+             stats.timeByCategory[task.taskType] = (stats.timeByCategory[task.taskType] || 0) + totalDuration;
+        }
+        if (subject.timeByCategory[task.taskType] !== undefined) {
+             subject.timeByCategory[task.taskType] = (subject.timeByCategory[task.taskType] || 0) + totalDuration;
+        }
 
         subject.totalTime += totalDuration;
         chapter.totalTime += totalDuration;
@@ -196,7 +201,10 @@ export function calculateProgress(tasks: Task[]): ProgressStats {
             chapter.accuracies.push(accuracy);
         }
         
-        if (task.taskType === 'Practice' && task.totalQuestions !== undefined && task.correctAnswers !== undefined) {
+        // Include new Practice types in question aggregation
+        const isPracticeTask = ['Practice', 'Practice7th', 'Practice9th'].includes(task.taskType);
+
+        if (isPracticeTask && task.totalQuestions !== undefined && task.correctAnswers !== undefined) {
             const totalQ = task.totalQuestions;
             const correctA = task.correctAnswers;
             const incorrectA = task.incorrectAnswers || 0;
@@ -247,7 +255,9 @@ export function calculateProgress(tasks: Task[]): ProgressStats {
                 microtopic.accuracies.push(accuracy);
             }
 
-            if (task.taskType === 'Practice' && task.totalQuestions !== undefined && task.correctAnswers !== undefined) {
+            const isPracticeTask = ['Practice', 'Practice7th', 'Practice9th'].includes(task.taskType);
+
+            if (isPracticeTask && task.totalQuestions !== undefined && task.correctAnswers !== undefined) {
                 const totalQ = task.totalQuestions;
                 const correctA = task.correctAnswers;
                 const incorrectA = task.incorrectAnswers || 0;

@@ -1,9 +1,8 @@
-
 import React, { useMemo, useState, useEffect } from 'react';
 import { Task, ProgressStats, SubjectName, SubjectStats, AnalyzedTopic, TaskType, TestPlan, ChapterStats, MicrotopicStats, SubjectTestPerformance, Priority, StudySession, RevisionAttempt, BreakSession, DailyLog } from '../types';
 import { calculateProgress, analyzeTopicsForSubject, formatDuration, calculateStudyTimeStats, calculateOverallScore, getScoreColorClass, getScoreBgClass, getCurrentWeekString } from '../lib/utils';
 import { cn } from '../lib/utils';
-import { ChevronDownIcon, AtomIcon, FlaskConicalIcon, LeafIcon, DnaIcon, BookOpenIcon, RepeatIcon, TargetIcon, CheckCircleIcon, TrophyIcon, ClockIcon, BrainCircuitIcon, AlertTriangleIcon, ShareIcon, CopyIcon, StickyNoteIcon, ZapIcon } from './ui/Icons';
+import { ChevronDownIcon, AtomIcon, FlaskConicalIcon, LeafIcon, DnaIcon, BookOpenIcon, RepeatIcon, TargetIcon, CheckCircleIcon, TrophyIcon, ClockIcon, BrainCircuitIcon, AlertTriangleIcon, ShareIcon, CopyIcon, StickyNoteIcon } from './ui/Icons';
 import { Card, Select, Modal, Input, Button } from './ui/StyledComponents';
 import DailyReport from './DailyReport';
 import WeeklyReport from './WeeklyReport';
@@ -114,51 +113,21 @@ const MicrotopicHistoryModal: React.FC<{
         return allItems;
     }, [tasks, topic]);
     
-    // Updated calculation for revision details to support the new workflow logic
     const calculateRevisionDetails = (lectureTask: Task) => {
-        // Look for tasks generated from this lecture
-        const associatedTasks = tasks.filter(t => t.sourceLectureTaskId === lectureTask.id);
+        const REVISION_SCHEDULE = [3, 5, 7, 15, 30];
+        const associatedRevisionTasks = tasks.filter(t => t.sourceLectureTaskId === lectureTask.id && t.taskType === 'SpacedRevision');
         
-        // This attempts to guess if it's normal or hyper based on presence of Day 1
-        const hasHyperTasks = associatedTasks.some(t => t.revisionDay === 1);
-        
-        let workflowSteps;
-        if (hasHyperTasks) {
-             workflowSteps = [
-                { day: 0, type: 'Notes', label: 'Rush: Rapid Notes' },
-                { day: 1, type: 'Revision', label: 'Rush: Recall' },
-                { day: 3, type: 'Practice', label: 'Rush: Speed Prac' },
-                { day: 7, type: 'Revision', label: 'Rush: Final Rev' },
-            ];
-        } else {
-             workflowSteps = [
-                { day: 0, type: 'Notes', label: 'Step 2: Notes' },
-                { day: 0, type: 'Revision', label: 'Step 3: Rev & HW' },
-                { day: 4, type: 'Revision', label: 'Step 4: 4th Day' },
-                { day: 9, type: 'Practice', label: 'Step 5: 9th Day' },
-                { day: 15, type: 'Practice', label: 'Step 6: 15th Day' },
-            ];
-        }
-
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        return workflowSteps.map(step => {
-            // Find task matching revisionDay and type
-            const foundTask = associatedTasks.find(t => t.revisionDay === step.day && t.taskType === step.type);
-            
-            // Check legacy revision history for backward compatibility
-            const completedLegacy = lectureTask.revisionHistory?.find(rev => rev.revisionDay === step.day);
+        return REVISION_SCHEDULE.map(day => {
+            const completedData = lectureTask.revisionHistory?.find(rev => rev.revisionDay === day);
+            if (completedData) return { day, status: 'Completed' as const, data: completedData };
 
-            if (foundTask) {
-                const taskDate = new Date(new Date(foundTask.date).toLocaleString("en-US", { timeZone: "UTC" }));
-                if (foundTask.status === 'Completed') {
-                    return { day: step.day, label: step.label, status: 'Completed' as const, data: foundTask };
-                } else {
-                    return { day: step.day, label: step.label, status: taskDate < today ? 'Overdue' as const : 'Pending' as const, data: foundTask };
-                }
-            } else if (completedLegacy) {
-                 return { day: step.day, label: step.label, status: 'Completed' as const, data: completedLegacy };
+            const pendingTask = associatedRevisionTasks.find(revTask => revTask.revisionDay === day);
+            if (pendingTask) {
+                const taskDate = new Date(new Date(pendingTask.date).toLocaleString("en-US", { timeZone: "UTC" }));
+                return { day, status: taskDate < today ? 'Overdue' as const : 'Pending' as const, data: pendingTask };
             }
             return null;
         }).filter(Boolean);
@@ -175,8 +144,12 @@ const MicrotopicHistoryModal: React.FC<{
                            Lecture: "bg-brand-amber-900/50 text-brand-amber-300 border-brand-amber-700",
                            Revision: "bg-green-900/50 text-green-300 border-green-700",
                            Practice: "bg-brand-orange-900/50 text-brand-orange-400 border-brand-orange-700",
+                           Notes: "bg-slate-700/50 text-slate-300 border-slate-600",
+                           RevisionHW: "bg-teal-900/50 text-teal-300 border-teal-700",
+                           Revision4th: "bg-cyan-900/50 text-cyan-300 border-cyan-700",
+                           Practice7th: "bg-violet-900/50 text-violet-300 border-violet-700",
+                           Practice9th: "bg-pink-900/50 text-pink-300 border-pink-700",
                            SpacedRevision: "bg-cyan-900/50 text-cyan-300 border-cyan-700",
-                           Notes: "bg-indigo-900/50 text-indigo-300 border-indigo-700",
                         };
                         
                         const revisionDetails = item.type === 'Lecture' && item.originalTask ? calculateRevisionDetails(item.originalTask) : [];
@@ -234,27 +207,21 @@ const MicrotopicHistoryModal: React.FC<{
 
                                 {isExpanded && revisionDetails.length > 0 && (
                                     <div className="pt-3 mt-3 border-t border-white/10 animate-fadeIn">
-                                        <strong className="text-gray-300 font-display">Progression:</strong>
+                                        <strong className="text-gray-300 font-display">Spaced Revision Progress:</strong>
                                         <div className="space-y-3 mt-2 pl-2">
-                                            {revisionDetails.map((rev, idx) => {
+                                            {revisionDetails.map(rev => {
                                                 if (!rev) return null;
-                                                const { label, status, data } = rev;
+                                                const { day, status, data } = rev;
                                                 
                                                 if (status === 'Completed') {
-                                                    const details = (data as any).date ? data as Task : data as RevisionAttempt; // Differentiate based on type structure if needed, currently similar
-                                                    // Handle legacy RevisionAttempt vs Task
-                                                    const dateStr = (data as Task).date || (data as RevisionAttempt).date;
-                                                    const duration = (data as Task).sessions ? (data as Task).sessions.reduce((a,b)=>a+b.duration,0) : (data as RevisionAttempt).duration;
-                                                    const diff = (data as Task).difficulty || (data as RevisionAttempt).difficulty;
-                                                    const notes = (data as Task).notes || (data as RevisionAttempt).notes;
-
+                                                    const details = data as RevisionAttempt;
                                                     return (
-                                                        <div key={idx} className="flex items-start gap-3 text-xs">
+                                                        <div key={day} className="flex items-start gap-3 text-xs">
                                                             <CheckCircleIcon className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
                                                             <div>
-                                                                <p className="font-semibold text-gray-200">{label} - Completed <span className="text-gray-400 font-normal">on {new Date(dateStr).toLocaleDateString()}</span></p>
-                                                                <p className="text-gray-400">Duration: <span className="font-semibold text-gray-300">{formatDuration(duration || 0)}</span> {diff ? `| Diff: ${diff}/5` : ''}</p>
-                                                                {notes && <p className="mt-1 p-2 bg-black/30 rounded whitespace-pre-wrap font-mono text-gray-300">{notes}</p>}
+                                                                <p className="font-semibold text-gray-200">Day {day} Revision - Completed <span className="text-gray-400 font-normal">on {new Date(details.date).toLocaleDateString()}</span></p>
+                                                                <p className="text-gray-400">Difficulty: <span className="font-semibold text-gray-300">{details.difficulty}/5</span> | Duration: <span className="font-semibold text-gray-300">{formatDuration(details.duration)}</span></p>
+                                                                {details.notes && <p className="mt-1 p-2 bg-black/30 rounded whitespace-pre-wrap font-mono text-gray-300">{details.notes}</p>}
                                                             </div>
                                                         </div>
                                                     );
@@ -265,10 +232,10 @@ const MicrotopicHistoryModal: React.FC<{
 
                                                 if (status === 'Pending') {
                                                     return (
-                                                        <div key={idx} className="flex items-start gap-3 text-xs">
+                                                        <div key={day} className="flex items-start gap-3 text-xs">
                                                             <ClockIcon className="w-4 h-4 text-brand-amber-400 flex-shrink-0 mt-0.5" />
                                                             <div>
-                                                                <p className="font-semibold text-gray-300">{label} - Pending</p>
+                                                                <p className="font-semibold text-gray-300">Day {day} Revision - Pending</p>
                                                                 <p className="text-gray-400">Scheduled for {scheduledDate}</p>
                                                             </div>
                                                         </div>
@@ -277,10 +244,10 @@ const MicrotopicHistoryModal: React.FC<{
                                                 
                                                 if (status === 'Overdue') {
                                                     return (
-                                                         <div key={idx} className="flex items-start gap-3 text-xs">
+                                                         <div key={day} className="flex items-start gap-3 text-xs">
                                                             <AlertTriangleIcon className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
                                                             <div>
-                                                                <p className="font-semibold text-red-300">{label} - Overdue</p>
+                                                                <p className="font-semibold text-red-300">Day {day} Revision - Overdue</p>
                                                                 <p className="text-gray-400">Was scheduled for {scheduledDate}</p>
                                                             </div>
                                                         </div>
@@ -359,12 +326,6 @@ const OverallProgressSummary: React.FC<{ stats: ProgressStats }> = ({ stats }) =
                             <TargetIcon className="w-4 h-4 text-brand-orange-400" />
                             <span><strong className="text-gray-200">{formatDuration(stats.timeByCategory.Practice)}</strong></span>
                         </div>
-                         {stats.timeByCategory.Notes > 0 && (
-                            <div className="flex items-center gap-1.5" title="Notes Time">
-                                <StickyNoteIcon className="w-4 h-4 text-indigo-400" />
-                                <span><strong className="text-gray-200">{formatDuration(stats.timeByCategory.Notes)}</strong></span>
-                            </div>
-                        )}
                     </div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-center">
@@ -437,8 +398,12 @@ const ActivityTracker: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
         Lecture: <BookOpenIcon className="w-5 h-5 text-brand-amber-400" />,
         Revision: <RepeatIcon className="w-5 h-5 text-green-400" />,
         Practice: <TargetIcon className="w-5 h-5 text-brand-orange-400" />,
+        Notes: <StickyNoteIcon className="w-5 h-5 text-slate-400" />,
+        RevisionHW: <RepeatIcon className="w-5 h-5 text-teal-400" />,
+        Revision4th: <RepeatIcon className="w-5 h-5 text-cyan-400" />,
+        Practice7th: <TargetIcon className="w-5 h-5 text-violet-400" />,
+        Practice9th: <TargetIcon className="w-5 h-5 text-pink-400" />,
         SpacedRevision: <BrainCircuitIcon className="w-5 h-5 text-cyan-400" />,
-        Notes: <StickyNoteIcon className="w-5 h-5 text-indigo-400" />,
     };
 
     return (
@@ -740,8 +705,8 @@ const subjectTabs: { name: SubjectName, icon: React.FC<React.SVGProps<SVGSVGElem
     { name: 'Zoology', icon: DnaIcon },
 ];
 
-const CountdownTimer: React.FC<{ targetDateStr: string }> = ({ targetDateStr }) => {
-    const targetDate = useMemo(() => targetDateStr ? new Date(targetDateStr) : new Date('2026-05-03T14:00:00'), [targetDateStr]);
+const CountdownTimer = () => {
+    const targetDate = useMemo(() => new Date('2026-05-03T14:00:00'), []);
     const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
     useEffect(() => {
@@ -768,7 +733,7 @@ const CountdownTimer: React.FC<{ targetDateStr: string }> = ({ targetDateStr }) 
         <Card className="flex flex-col items-center justify-center p-6 text-center">
             <h2 className="font-display flex items-center gap-2 text-xl font-semibold text-brand-amber-400 mb-4">
                 <TrophyIcon className="w-6 h-6" />
-                Countdown to Exam
+                Countdown to NEET 2026
             </h2>
             <div className="flex space-x-4 md:space-x-8">
                 {Object.entries(timeLeft).map(([unit, value]) => (
@@ -778,7 +743,7 @@ const CountdownTimer: React.FC<{ targetDateStr: string }> = ({ targetDateStr }) 
                     </div>
                 ))}
             </div>
-            <p className="text-xs text-gray-500 mt-4">Target: {targetDate.toLocaleDateString()}</p>
+            <p className="text-xs text-gray-500 mt-4">Target: 3rd May 2026, 2:00 PM</p>
         </Card>
     );
 };
@@ -831,109 +796,445 @@ const TestPerformanceSummary: React.FC<{ completedTests: TestPlan[] }> = ({ comp
     )
 };
 
-const Dashboard: React.FC<{ targetDate: string }> = ({ targetDate }) => {
-    const tasks = useLiveQuery(() => db.tasks.toArray(), []);
-    const breakSessions = useLiveQuery(() => db.breakSessions.toArray(), []);
-    const testPlans = useLiveQuery(() => db.testPlans.toArray(), []);
-    
-    const [selectedTopic, setSelectedTopic] = useState<{ subject: SubjectName; chapter: string; microtopic: string; } | null>(null);
-    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<SubjectName>('Physics');
+const TimeAllocationChart: React.FC<{ studyTime: number, breakTime: number }> = ({ studyTime, breakTime }) => {
+    const data = [
+        { name: 'Study', value: studyTime },
+        { name: 'Breaks', value: breakTime },
+    ].filter(d => d.value > 0);
 
-    const progressStats = useMemo(() => tasks ? calculateProgress(tasks) : {
-        totalTasks: 0, completedTasks: 0, completionRate: 0, subjects: {
-            Physics: { total: 0, completed: 0, completionRate: 0, avgDifficulty: 0, avgAccuracy: null, difficulties: [], accuracies: [], chapters: {}, totalTime: 0, timeByCategory: { Lecture: 0, Revision: 0, Practice: 0, SpacedRevision: 0, Notes: 0 }, totalQuestions: 0, totalCorrect: 0, totalIncorrect: 0, totalSkipped: 0 },
-            Chemistry: { total: 0, completed: 0, completionRate: 0, avgDifficulty: 0, avgAccuracy: null, difficulties: [], accuracies: [], chapters: {}, totalTime: 0, timeByCategory: { Lecture: 0, Revision: 0, Practice: 0, SpacedRevision: 0, Notes: 0 }, totalQuestions: 0, totalCorrect: 0, totalIncorrect: 0, totalSkipped: 0 },
-            Botany: { total: 0, completed: 0, completionRate: 0, avgDifficulty: 0, avgAccuracy: null, difficulties: [], accuracies: [], chapters: {}, totalTime: 0, timeByCategory: { Lecture: 0, Revision: 0, Practice: 0, SpacedRevision: 0, Notes: 0 }, totalQuestions: 0, totalCorrect: 0, totalIncorrect: 0, totalSkipped: 0 },
-            Zoology: { total: 0, completed: 0, completionRate: 0, avgDifficulty: 0, avgAccuracy: null, difficulties: [], accuracies: [], chapters: {}, totalTime: 0, timeByCategory: { Lecture: 0, Revision: 0, Practice: 0, SpacedRevision: 0, Notes: 0 }, totalQuestions: 0, totalCorrect: 0, totalIncorrect: 0, totalSkipped: 0 },
-        },
-        totalTimeStudied: 0, timeByCategory: { Lecture: 0, Revision: 0, Practice: 0, SpacedRevision: 0, Notes: 0 },
-        totalQuestions: 0, totalCorrect: 0, totalIncorrect: 0, totalSkipped: 0
-    }, [tasks]);
+    const COLORS = ['#F59E0B', '#06B6D4'];
 
-    const chapterTestFrequency = useMemo(() => {
-        const freq: ChapterFrequency = {};
-        if (testPlans) {
-            testPlans.forEach(plan => {
-                if (plan.syllabus) {
-                    (Object.keys(plan.syllabus) as SubjectName[]).forEach(subject => {
-                        if (!freq[subject]) freq[subject] = {};
-                        plan.syllabus[subject]?.forEach(chapter => {
-                            freq[subject]![chapter] = (freq[subject]![chapter] || 0) + 1;
-                        });
-                    });
-                }
-            });
-        }
-        return freq;
-    }, [testPlans]);
-
-    const completedTests = useMemo(() => testPlans?.filter(t => t.status === 'Completed') || [], [testPlans]);
-
-    const handleMicrotopicClick = (subject: SubjectName, chapter: string, microtopic: string) => {
-        setSelectedTopic({ subject, chapter, microtopic });
-        setIsHistoryOpen(true);
-    };
-
-    if (!tasks || !breakSessions || !testPlans) return <div className="p-8 text-center">Loading dashboard data...</div>;
+    if (data.length === 0) {
+        return <p className="text-center text-gray-400 py-8">No time logged for this period.</p>;
+    }
 
     return (
-        <div className="space-y-8 pb-20">
+        <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                    <Pie
+                        data={data}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+                            const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                            const x = cx + radius * Math.cos(-midAngle * (Math.PI / 180));
+                            const y = cy + radius * Math.sin(-midAngle * (Math.PI / 180));
+                            return (
+                                <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize="14" fontWeight="bold">
+                                    {`${(percent * 100).toFixed(0)}%`}
+                                </text>
+                            );
+                        }}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        dataKey="value"
+                    >
+                        {data.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                    </Pie>
+                    <Tooltip
+                        contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '0.5rem' }}
+                        formatter={(value: number) => formatDuration(value)}
+                    />
+                    <Legend />
+                </PieChart>
+            </ResponsiveContainer>
+        </div>
+    );
+};
+
+const BreakdownOfBreaksChart: React.FC<{ breakSessions: BreakSession[] }> = ({ breakSessions }) => {
+    const breakData = useMemo(() => {
+        if (breakSessions.length === 0) return [];
+        const grouped = breakSessions.reduce((acc, session) => {
+            const type = session.type === 'Other' && session.customType ? session.customType : session.type;
+            if (!acc[type]) {
+                acc[type] = 0;
+            }
+            acc[type] += session.duration;
+            return acc;
+        }, {} as Record<string, number>);
+
+        return Object.entries(grouped).map(([name, time]) => ({ name, time }));
+    }, [breakSessions]);
+
+    if (breakData.length === 0) {
+        return <p className="text-center text-gray-400 py-8">No breaks logged for this period.</p>;
+    }
+    
+     const CustomTooltip = ({ active, payload, label }: any) => {
+        if (active && payload && payload.length) {
+            return (
+                <div className="bg-slate-900/80 backdrop-blur-sm p-2 border border-cyan-500/30 rounded-md text-sm">
+                    <p className="label text-gray-300">{`${label}`}</p>
+                    <p className="intro text-cyan-400">{`Total: ${formatDuration(payload[0].value)}`}</p>
+                </div>
+            );
+        }
+        return null;
+    };
+
+    return (
+        <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={breakData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                    <defs>
+                        <linearGradient id="breakBarGradient" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#0891b2" stopOpacity={0.4}/>
+                        </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
+                    <XAxis type="number" tickFormatter={(tick) => `${(tick / 3600).toFixed(1)}h`} tick={{ fill: '#9ca3af', fontSize: 12 }} />
+                    <YAxis type="category" dataKey="name" width={80} tick={{ fill: '#9ca3af', fontSize: 12 }} />
+                    <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(34, 211, 238, 0.1)'}}/>
+                    <Bar dataKey="time" fill="url(#breakBarGradient)" radius={[0, 4, 4, 0]} />
+                </BarChart>
+            </ResponsiveContainer>
+        </div>
+    );
+};
+
+
+const DailyLogCard: React.FC<{
+    onSave: (data: Omit<DailyLog, 'date'>) => void;
+}> = ({ onSave }) => {
+    const [mood, setMood] = useState(3);
+    const [energy, setEnergy] = useState(3);
+    const [distractions, setDistractions] = useState('');
+    const [isSaved, setIsSaved] = useState(false);
+    
+    const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+    const dailyLog = useLiveQuery(() => db.dailyLogs.get(todayStr), [todayStr]);
+
+    useEffect(() => {
+        if (dailyLog) {
+            setMood(dailyLog.mood);
+            setEnergy(dailyLog.energy);
+            setDistractions(dailyLog.distractions);
+        }
+    }, [dailyLog]);
+    
+    const moodEmoji = ['😞', '😕', '😐', '🙂', '😄'];
+    const energyEmoji = ['🪫', '🔋', '⚡️', '🚀', '🔥'];
+
+    const handleSave = () => {
+        onSave({ mood, energy, distractions });
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 2000);
+    };
+
+    return (
+        <div>
+            <h2 className="font-display text-lg font-semibold text-brand-amber-400 mb-4">Daily Log</h2>
+            <div className="space-y-4">
+                 <div>
+                    <label className="block text-sm font-medium mb-2 font-display">Mood {moodEmoji[mood-1]}</label>
+                    <input type="range" min="1" max="5" value={mood} onChange={e => setMood(Number(e.target.value))} className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer range-lg accent-brand-amber-500" />
+                </div>
+                 <div>
+                    <label className="block text-sm font-medium mb-2 font-display">Energy Level {energyEmoji[energy-1]}</label>
+                    <input type="range" min="1" max="5" value={energy} onChange={e => setEnergy(Number(e.target.value))} className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer range-lg accent-brand-amber-500" />
+                </div>
+                <div>
+                     <label className="block text-sm font-medium mb-1 font-display">Distractions / Notes</label>
+                    <Input type="text" value={distractions} onChange={e => setDistractions(e.target.value)} placeholder="e.g., Social media, family talk..." />
+                </div>
+                <Button onClick={handleSave} variant="secondary" className="w-full">
+                    {isSaved ? 'Log Saved!' : 'Save Daily Log'}
+                </Button>
+            </div>
+        </div>
+    );
+};
+
+const Dashboard: React.FC = () => {
+    const tasks = useLiveQuery(() => db.tasks.toArray(), []);
+    const testPlans = useLiveQuery(() => db.testPlans.toArray(), []);
+    const breakSessions = useLiveQuery(() => db.breakSessions.toArray(), []);
+    const [stats, setStats] = useState<ProgressStats | null>(null);
+
+    const [activeTab, setActiveTab] = useState<SubjectName>('Physics');
+    const [historyModalTopic, setHistoryModalTopic] = useState<{ subject: SubjectName; chapter: string; microtopic: string; } | null>(null);
+    const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'all'>('today');
+
+    const [reportType, setReportType] = useState<'Daily' | 'Weekly' | 'Monthly' | 'Overall'>('Daily');
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
+    const [reportWeek, setReportWeek] = useState(getCurrentWeekString());
+    const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7));
+
+
+    useEffect(() => {
+        if (tasks) {
+            setTimeout(() => {
+                const calculatedStats = calculateProgress(tasks);
+                setStats(calculatedStats);
+            }, 10);
+        }
+    }, [tasks]);
+
+    const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+    const completedTests = useMemo(() => testPlans?.filter(t => t.status === 'Completed' && t.analysis) || [], [testPlans]);
+
+    const chapterTestFrequency: ChapterFrequency = useMemo(() => {
+        if (!testPlans) return {};
+        const frequency: ChapterFrequency = {};
+        for (const testPlan of testPlans) {
+            if (!testPlan.syllabus) continue;
+            for (const subjectName of Object.keys(testPlan.syllabus) as SubjectName[]) {
+                if (!frequency[subjectName]) frequency[subjectName] = {};
+                const chapters = testPlan.syllabus[subjectName] || [];
+                for (const chapterName of chapters) {
+                    const subjectFreq = frequency[subjectName]!;
+                    if (!subjectFreq[chapterName]) subjectFreq[chapterName] = 0;
+                    subjectFreq[chapterName] += 1;
+                }
+            }
+        }
+        return frequency;
+    }, [testPlans]);
+
+    const handleMicrotopicClick = (subject: SubjectName, chapter: string, microtopic: string) => {
+        setHistoryModalTopic({ subject, chapter, microtopic });
+    };
+
+    const handleSaveLog = async (data: Omit<DailyLog, 'date'>) => {
+        await db.dailyLogs.put({ date: todayStr, ...data });
+    };
+    
+    const getStartDate = (period: 'today' | 'week' | 'month' | 'all'): Date | null => {
+        const now = new Date();
+        if (period === 'all') return null;
+
+        const start = new Date(now);
+        start.setHours(0, 0, 0, 0);
+
+        if (period === 'today') {
+            return start;
+        }
+        if (period === 'week') {
+            const day = start.getDay();
+            const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+            return new Date(start.setDate(diff));
+        }
+        if (period === 'month') {
+            return new Date(start.getFullYear(), start.getMonth(), 1);
+        }
+        return null;
+    };
+    
+    const studyTimeForPeriod = useMemo(() => {
+        const startDate = getStartDate(period);
+        if (!startDate) return stats?.totalTimeStudied || 0;
+        let totalDuration = 0;
+        (tasks || []).forEach(task => {
+            (task.sessions || []).forEach(session => {
+                if (new Date(session.date) >= startDate) {
+                    totalDuration += session.duration;
+                }
+            });
+        });
+        return totalDuration;
+    }, [tasks, period, stats]);
+
+    const filteredBreakSessions = useMemo(() => {
+        const startDate = getStartDate(period);
+        if (!startDate) return breakSessions || [];
+        return (breakSessions || []).filter(session => new Date(session.date) >= startDate);
+    }, [breakSessions, period]);
+
+    const totalBreakTimeForPeriod = useMemo(() => filteredBreakSessions.reduce((sum, s) => sum + s.duration, 0), [filteredBreakSessions]);
+    
+    const openReportModal = () => {
+        if (reportType === 'Daily' && !reportDate) {
+            alert('Please select a date.');
+            return;
+        }
+        if (reportType === 'Weekly' && !reportWeek) {
+            alert('Please select a week.');
+            return;
+        }
+        if (reportType === 'Monthly' && !reportMonth) {
+            alert('Please select a month.');
+            return;
+        }
+        setIsReportModalOpen(true);
+    };
+
+    if (tasks === undefined || testPlans === undefined || stats === null || breakSessions === undefined) {
+        return (
+            <div className="space-y-8">
+                 <h1 className="font-display text-4xl font-bold text-brand-amber-400 tracking-wide">Dashboard</h1>
+                 <div className="flex items-center justify-center min-h-[50vh] text-gray-300">
+                    <p className="font-display text-xl animate-pulse">Loading and analyzing your progress...</p>
+                </div>
+            </div>
+        );
+    }
+
+    const activeSubjectStats = stats.subjects[activeTab];
+
+    return (
+        <div className="space-y-8">
             <h1 className="font-display text-4xl font-bold text-brand-amber-400 tracking-wide">Dashboard</h1>
             
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <OverallProgressSummary stats={progressStats} />
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-8">
-                    <ActivityTracker tasks={tasks} />
-                    <StudyVsBreakTimeAnalytics tasks={tasks} breakSessions={breakSessions} />
-                </div>
-                <div className="lg:col-span-1 space-y-8">
-                    <CountdownTimer targetDateStr={targetDate} />
-                    <TestPerformanceSummary completedTests={completedTests} />
-                </div>
-            </div>
-
-            <section>
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-2xl font-bold text-brand-amber-400">Subject Performance</h2>
-                </div>
-                
-                <div className="flex space-x-1 overflow-x-auto mb-4 border-b border-white/10 pb-1">
-                    {subjectTabs.map(tab => (
-                        <button
-                            key={tab.name}
-                            onClick={() => setActiveTab(tab.name)}
-                            className={cn(
-                                "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors duration-300",
-                                activeTab === tab.name
-                                    ? 'bg-slate-900/50 text-brand-amber-400 border-b-2 border-brand-amber-400'
-                                    : 'text-gray-400 hover:bg-white/5 hover:text-white'
+            <CountdownTimer />
+            
+            <Card className="p-6">
+                <DailyLogCard onSave={handleSaveLog} />
+                <div className="border-t border-white/10 mt-6 pt-4">
+                     <label className="block text-sm font-medium mb-2 font-display">Generate Report</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                         <Select value={reportType} onChange={e => setReportType(e.target.value as any)}>
+                            <option value="Daily">Daily</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="Monthly">Monthly</option>
+                            <option value="Overall">Overall</option>
+                        </Select>
+                        <div className="sm:col-span-2 flex gap-2">
+                             {reportType === 'Daily' && (
+                                <Input 
+                                    type="date" 
+                                    value={reportDate} 
+                                    onChange={e => setReportDate(e.target.value)} 
+                                    className="flex-grow"
+                                />
                             )}
-                        >
-                            <tab.icon className="w-5 h-5" />
-                            {tab.name}
-                        </button>
-                    ))}
+                            {reportType === 'Weekly' && (
+                                <Input 
+                                    type="week" 
+                                    value={reportWeek}
+                                    onChange={e => setReportWeek(e.target.value)}
+                                    className="flex-grow"
+                                />
+                            )}
+                            {reportType === 'Monthly' && (
+                                <Input 
+                                    type="month"
+                                    value={reportMonth}
+                                    onChange={e => setReportMonth(e.target.value)}
+                                    className="flex-grow"
+                                />
+                            )}
+                            <Button onClick={openReportModal} className={cn(reportType === 'Overall' && 'flex-grow')}>Generate</Button>
+                        </div>
+                    </div>
+                </div>
+            </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <OverallProgressSummary stats={stats} />
+            </div>
+
+            <TestPerformanceSummary completedTests={completedTests} />
+
+            <Card className="p-6">
+                <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4">
+                    <h2 className="font-display text-lg font-semibold text-brand-amber-400">Time Analysis</h2>
+                    <div className="flex items-center bg-black/20 rounded-lg p-1 self-start md:self-center">
+                        {(['today', 'week', 'month', 'all'] as const).map(p => (
+                            <button key={p} onClick={() => setPeriod(p)} className={cn("px-3 py-1 text-sm rounded-md transition-colors font-display capitalize", period === p ? "bg-brand-amber-400 text-brand-amber-900 font-semibold" : "text-gray-300 hover:bg-white/10")}>
+                                {p === 'all' ? 'All Time' : `This ${p}`}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div>
+                        <h3 className="font-semibold text-center mb-2">Study vs. Break Allocation</h3>
+                        <TimeAllocationChart studyTime={studyTimeForPeriod} breakTime={totalBreakTimeForPeriod} />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-center mb-2">Breakdown of Breaks</h3>
+                        <BreakdownOfBreaksChart breakSessions={filteredBreakSessions} />
+                    </div>
+                </div>
+            </Card>
+            
+            <StudyVsBreakTimeAnalytics tasks={tasks} breakSessions={breakSessions} />
+
+            <ActivityTracker tasks={tasks} />
+            
+            <Card>
+                <div className="border-b border-white/10">
+                    <div className="flex space-x-1 overflow-x-auto p-2">
+                        {subjectTabs.map(tab => (
+                            <button
+                                key={tab.name}
+                                onClick={() => setActiveTab(tab.name)}
+                                className={cn(
+                                    "flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-display font-medium rounded-md transition-colors duration-300",
+                                    activeTab === tab.name
+                                        ? 'bg-brand-amber-400 text-brand-amber-900 shadow-md'
+                                        : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                                )}
+                            >
+                                <tab.icon className="w-5 h-5" />
+                                {tab.name}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
-                <SubjectDetailView 
-                    subjectName={activeTab}
-                    subjectStats={progressStats.subjects[activeTab]}
-                    onMicrotopicClick={handleMicrotopicClick}
-                    chapterTestFrequency={chapterTestFrequency}
-                    completedTests={completedTests}
-                />
-            </section>
+                {activeSubjectStats && (
+                    <SubjectDetailView
+                        key={activeTab}
+                        subjectName={activeTab}
+                        subjectStats={activeSubjectStats}
+                        onMicrotopicClick={handleMicrotopicClick}
+                        chapterTestFrequency={chapterTestFrequency}
+                        completedTests={completedTests}
+                    />
+                )}
+            </Card>
 
-            <MicrotopicHistoryModal 
-                isOpen={isHistoryOpen} 
-                onClose={() => setIsHistoryOpen(false)} 
-                tasks={tasks} 
-                topic={selectedTopic}
+            <MicrotopicHistoryModal
+                isOpen={!!historyModalTopic}
+                onClose={() => setHistoryModalTopic(null)}
+                tasks={tasks}
+                topic={historyModalTopic}
             />
+            
+            {isReportModalOpen && reportType === 'Daily' && (
+                <DailyReport
+                    date={new Date(new Date(reportDate).toLocaleString("en-US", { timeZone: "UTC" }))}
+                    allTasks={tasks}
+                    allTestPlans={testPlans}
+                    allBreakSessions={breakSessions}
+                    onClose={() => setIsReportModalOpen(false)}
+                />
+            )}
+            {isReportModalOpen && reportType === 'Weekly' && reportWeek && (
+                <WeeklyReport
+                    week={reportWeek}
+                    allTasks={tasks}
+                    allTestPlans={testPlans}
+                    allBreakSessions={breakSessions}
+                    onClose={() => setIsReportModalOpen(false)}
+                />
+            )}
+            {isReportModalOpen && reportType === 'Monthly' && reportMonth && (
+                <MonthlyReport
+                    month={reportMonth}
+                    allTasks={tasks}
+                    allTestPlans={testPlans}
+                    allBreakSessions={breakSessions}
+                    onClose={() => setIsReportModalOpen(false)}
+                />
+            )}
+            {isReportModalOpen && reportType === 'Overall' && (
+                <OverallReport
+                    allTasks={tasks}
+                    allTestPlans={testPlans}
+                    allBreakSessions={breakSessions}
+                    onClose={() => setIsReportModalOpen(false)}
+                />
+            )}
         </div>
     );
 };
