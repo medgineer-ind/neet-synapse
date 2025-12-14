@@ -1,3 +1,4 @@
+
 import { Task, ProgressStats, SubjectName, ChapterStats, MicrotopicStats, SubjectStats, TestPlan, AnalyzedTopic, TaskType } from "../types";
 import { syllabus } from "../data/syllabus";
 
@@ -122,7 +123,7 @@ const createEmptyStats = () => ({
   totalSkipped: 0,
 });
 
-const emptyTimeByCategory = { Lecture: 0, Revision: 0, Practice: 0, SpacedRevision: 0 };
+const emptyTimeByCategory = { Lecture: 0, Revision: 0, Practice: 0, SpacedRevision: 0, Notes: 0 };
 
 export function calculateProgress(tasks: Task[]): ProgressStats {
   // Initialize the stats object with the full syllabus structure

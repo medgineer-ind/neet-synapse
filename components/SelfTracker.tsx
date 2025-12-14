@@ -1,5 +1,3 @@
-
-
 import React, { useMemo } from 'react';
 import { Task, TestPlan, SubjectName, ProgressStats, ChapterStats, SubjectStats, MicrotopicStats, StudySession } from '../types';
 import { Card } from './ui/StyledComponents';
@@ -407,8 +405,8 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
             if (completedDays.includes(today.toISOString().split('T')[0]) || completedDays.includes(yesterday.toISOString().split('T')[0])) {
                 completionStreak = 1;
                 for (let i = completedDays.length - 1; i > 0; i--) {
-                    const current = new Date(completedDays[i]);
-                    const prev = new Date(completedDays[i - 1]);
+                    const current = new Date(completedDays[i] as string);
+                    const prev = new Date(completedDays[i - 1] as string);
                     if ((current.getTime() - prev.getTime()) / (1000 * 3600 * 24) === 1) {
                         completionStreak++;
                     } else break;
@@ -429,8 +427,8 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
             if(studyDays.includes(todayStr) || studyDays.includes(yesterdayStr)) {
                 consistencyStreak = 1;
                 for (let i = studyDays.length - 1; i > 0; i--) {
-                    const current = new Date(studyDays[i]);
-                    const prev = new Date(studyDays[i - 1]);
+                    const current = new Date(studyDays[i] as string);
+                    const prev = new Date(studyDays[i - 1] as string);
                     if ((current.getTime() - prev.getTime()) / (1000 * 3600 * 24) === 1) {
                         consistencyStreak++;
                     } else {

@@ -1,13 +1,26 @@
 
-
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Task, TestPlan } from '../types';
-import { ShareIcon, AlertTriangleIcon } from './ui/Icons';
-import { Card, Button } from './ui/StyledComponents';
-import { db } from '../services/db';
+import { ShareIcon, AlertTriangleIcon, CalendarClockIcon } from './ui/Icons';
+import { Card, Button, Input } from './ui/StyledComponents';
+import { db, setMiscItem, getMiscItem } from '../services/db';
+import { cn } from '../lib/utils';
 
 const Settings: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [targetDate, setTargetDate] = useState('');
+
+    useEffect(() => {
+        getMiscItem('targetDate', '').then((date) => {
+            if (date) setTargetDate(date);
+            else {
+                // Default to 139 days from now if not set
+                const d = new Date();
+                d.setDate(d.getDate() + 139);
+                setTargetDate(d.toISOString().split('T')[0]);
+            }
+        });
+    }, []);
 
     const handleReset = async () => {
         if (window.confirm('Are you sure you want to delete all your data (tasks and test plans)? This action cannot be undone.')) {
@@ -15,6 +28,12 @@ const Settings: React.FC = () => {
             await db.testPlans.clear();
             alert('All data has been reset.');
         }
+    };
+
+    const handleSavePreferences = async () => {
+        await setMiscItem('targetDate', targetDate);
+        alert('Exam date updated successfully.');
+        window.location.reload(); // Reload to apply global context changes efficiently
     };
 
     const handleExport = async () => {
@@ -92,6 +111,32 @@ const Settings: React.FC = () => {
     return (
         <div className="max-w-3xl mx-auto">
             <h1 className="font-display text-4xl font-bold text-brand-amber-400 mb-8 tracking-wide">Settings</h1>
+
+            <Card className="mb-8 p-6">
+                <h2 className="font-display text-2xl font-semibold text-brand-amber-400 mb-4 flex items-center gap-2">
+                    <CalendarClockIcon className="w-6 h-6" />
+                    Exam Settings
+                </h2>
+                <div className="space-y-6">
+                    <div>
+                        <label className="block font-bold text-gray-200 mb-2">
+                            Target Exam Date
+                        </label>
+                        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                            <Input 
+                                type="date" 
+                                value={targetDate} 
+                                onChange={e => setTargetDate(e.target.value)} 
+                                className="max-w-xs"
+                            />
+                            <Button onClick={handleSavePreferences} size="sm">
+                                Save Date
+                            </Button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">The countdown timer on your dashboard will adjust to this date.</p>
+                    </div>
+                </div>
+            </Card>
 
             <Card className="mb-8 p-6">
                 <h2 className="font-display text-2xl font-semibold text-brand-amber-400 mb-4">About NEET Synapse</h2>

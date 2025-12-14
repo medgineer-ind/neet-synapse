@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { Task, TestPlan, TaskType, Priority, RevisionAttempt } from '../types';
 import { cn } from '../lib/utils';
-import { BookOpenIcon, RepeatIcon, TargetIcon, TrophyIcon, BrainCircuitIcon, AlertTriangleIcon, ClockIcon } from './ui/Icons';
+import { BookOpenIcon, RepeatIcon, TargetIcon, TrophyIcon, BrainCircuitIcon, AlertTriangleIcon, ClockIcon, StickyNoteIcon } from './ui/Icons';
 import { Card } from './ui/StyledComponents';
 
 type AgendaItem = {
@@ -35,6 +35,7 @@ const TaskTypeTag: React.FC<{ type: TaskType }> = ({ type }) => {
         Revision: { icon: <RepeatIcon className="w-4 h-4" />, className: "bg-green-900/50 text-green-300 border-green-700" },
         Practice: { icon: <TargetIcon className="w-4 h-4" />, className: "bg-brand-orange-900/50 text-brand-orange-400 border-brand-orange-700" },
         SpacedRevision: { icon: <BrainCircuitIcon className="w-4 h-4" />, className: "bg-cyan-900/50 text-cyan-300 border-cyan-700" },
+        Notes: { icon: <StickyNoteIcon className="w-4 h-4" />, className: "bg-indigo-900/50 text-indigo-300 border-indigo-700" },
     };
     const { icon, className } = typeStyles[type];
     return (

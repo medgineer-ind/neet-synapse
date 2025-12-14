@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Task, TaskType, SubjectName, TestPlan, Priority, TaskStatus, ActiveTimer, RevisionAttempt } from '../types';
 import { syllabus } from '../data/syllabus';
@@ -231,6 +232,7 @@ const TaskForm: React.FC<{
                             <option value="Lecture">Lecture</option>
                             <option value="Revision">Revision</option>
                             <option value="Practice">Practice</option>
+                            <option value="Notes">Notes</option>
                         </Select>
                     </div>
                     <div>
@@ -267,6 +269,7 @@ const TaskTypeTag: React.FC<{ type: TaskType }> = ({ type }) => {
         Revision: { icon: <RepeatIcon className="w-4 h-4" />, className: "bg-green-900/50 text-green-300 border-green-700" },
         Practice: { icon: <TargetIcon className="w-4 h-4" />, className: "bg-brand-orange-900/50 text-brand-orange-400 border-brand-orange-700" },
         SpacedRevision: { icon: <BrainCircuitIcon className="w-4 h-4" />, className: "bg-cyan-900/50 text-cyan-300 border-cyan-700" },
+        Notes: { icon: <StickyNoteIcon className="w-4 h-4" />, className: "bg-indigo-900/50 text-indigo-300 border-indigo-700" },
     };
     const { icon, className } = typeStyles[type];
     return (
@@ -294,9 +297,10 @@ const TaskItem: React.FC<{
     const isTimerActiveForThisTask = activeTimer?.task?.id === task.id;
     const totalDuration = useMemo(() => (task.sessions || []).reduce((sum, s) => sum + s.duration, 0), [task.sessions]);
     
+    // Fetch associated tasks for the 6-step workflow
     const associatedRevisionTasks = useLiveQuery(
         () => task.taskType === 'Lecture' && task.status === 'Completed'
-            ? db.tasks.where({ sourceLectureTaskId: task.id as string }).and(t => t.taskType === 'SpacedRevision').toArray()
+            ? db.tasks.where({ sourceLectureTaskId: task.id as string }).toArray()
             : Promise.resolve([]), // Return a resolved promise with an empty array if not applicable
         [task.id, task.taskType, task.status]
     );
@@ -312,29 +316,49 @@ const TaskItem: React.FC<{
             return [];
         }
 
-        const REVISION_SCHEDULE = [3, 5, 7, 15, 30];
+        // Custom 6-Step Workflow Logic
+        // We look for tasks generated from this lecture based on revisionDay
+        // revisionDay 0 = Notes (Step 2) AND Rev/HW (Step 3)
+        // revisionDay 4 = Step 4
+        // revisionDay 9 = Step 5
+        // revisionDay 15 = Step 6
+
+        const workflowSteps = [
+            { day: 0, type: 'Notes' as TaskType, label: 'Step 2: Notes' },
+            { day: 0, type: 'Revision' as TaskType, label: 'Step 3: Rev & HW' },
+            { day: 4, type: 'Revision' as TaskType, label: 'Step 4: 4th Day Rev' },
+            { day: 9, type: 'Practice' as TaskType, label: 'Step 5: 9th Day Prac' },
+            { day: 15, type: 'Practice' as TaskType, label: 'Step 6: 15th Day Prac' },
+        ];
         
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        return REVISION_SCHEDULE.map(day => {
-            const completedData = task.revisionHistory?.find(rev => rev.revisionDay === day);
-            if (completedData) {
-                return {
-                    day,
-                    status: 'Completed' as const,
-                    data: completedData,
-                };
-            }
+        return workflowSteps.map(step => {
+            // Find the specific task for this step
+            const existingTask = associatedRevisionTasks.find(t => 
+                t.revisionDay === step.day && t.taskType === step.type
+            );
 
-            const pendingTask = associatedRevisionTasks.find(revTask => revTask.revisionDay === day);
-            if (pendingTask) {
-                const taskDate = new Date(new Date(pendingTask.date).toLocaleString("en-US", { timeZone: "UTC" }));
-                return {
-                    day,
-                    status: taskDate < today ? 'Overdue' as const : 'Pending' as const,
-                    data: pendingTask,
-                };
+            // Check if completed in revisionHistory (legacy or for future proofing) OR if the task itself is completed
+            const completedInHistory = task.revisionHistory?.find(rev => rev.revisionDay === step.day); // Note: Day 0 history might be ambiguous, but usually tied to task completion
+            
+            if (existingTask) {
+                const taskDate = new Date(new Date(existingTask.date).toLocaleString("en-US", { timeZone: "UTC" }));
+                if (existingTask.status === 'Completed') {
+                     return {
+                        stepLabel: step.label,
+                        status: 'Completed' as const,
+                        data: existingTask, // Use the task itself as data
+                        completionDate: existingTask.sessions && existingTask.sessions.length > 0 ? existingTask.sessions[0].date : existingTask.date
+                    };
+                } else {
+                     return {
+                        stepLabel: step.label,
+                        status: taskDate < today ? 'Overdue' as const : 'Pending' as const,
+                        data: existingTask,
+                    };
+                }
             }
             
             return null;
@@ -372,7 +396,7 @@ const TaskItem: React.FC<{
                 <div className="flex items-center gap-1 self-end sm:self-center flex-shrink-0 transition-opacity duration-300 lg:opacity-0 lg:group-hover:opacity-100">
                     {task.status === 'Pending' ? (
                         <>
-                            {task.taskType === 'SpacedRevision' ? (
+                            {task.taskType === 'SpacedRevision' ? ( // Legacy check, mostly won't be used with new flow but safe to keep
                                 <Button onClick={() => onStartRevision(task)} variant="secondary" size="sm" className="bg-cyan-500/10 text-cyan-300 border-cyan-500/20 hover:bg-cyan-500/20">
                                     <BrainCircuitIcon className="w-4 h-4" /> Start Revision
                                 </Button>
@@ -423,21 +447,21 @@ const TaskItem: React.FC<{
                     {task.notes && <div><strong className="text-gray-400 font-display">Notes:</strong><p className="whitespace-pre-wrap pl-2 mt-1 font-mono text-xs">{task.notes}</p></div>}
                     {task.taskType === 'Lecture' && revisionDetails.length > 0 && (
                         <div className="pt-3 mt-3 border-t border-white/10">
-                            <strong className="text-gray-400 font-display">Spaced Revision Progress:</strong>
+                            <strong className="text-gray-400 font-display">Lecture Progression:</strong>
                             <div className="space-y-3 mt-2 pl-2">
                                 {revisionDetails.map(rev => {
                                     if (!rev) return null;
-                                    const { day, status, data } = rev;
+                                    const { stepLabel, status, data, completionDate } = rev;
                                     
                                     if (status === 'Completed') {
-                                        const details = data as RevisionAttempt;
+                                        const taskData = data as Task;
                                         return (
-                                            <div key={day} className="flex items-start gap-3 text-xs">
+                                            <div key={stepLabel} className="flex items-start gap-3 text-xs">
                                                 <CheckCircleIcon className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
                                                 <div>
-                                                    <p className="font-semibold text-gray-200">Day {day} Revision - Completed <span className="text-gray-400 font-normal">on {new Date(details.date).toLocaleDateString()}</span></p>
-                                                    <p className="text-gray-400">Difficulty: <span className="font-semibold text-gray-300">{details.difficulty}/5</span> | Duration: <span className="font-semibold text-gray-300">{formatDuration(details.duration)}</span></p>
-                                                    {details.notes && <p className="mt-1 p-2 bg-black/30 rounded whitespace-pre-wrap font-mono text-gray-300">{details.notes}</p>}
+                                                    <p className="font-semibold text-gray-200">{stepLabel} - Completed <span className="text-gray-400 font-normal">on {new Date(completionDate!).toLocaleDateString()}</span></p>
+                                                    {taskData.difficulty && <p className="text-gray-400">Difficulty: <span className="font-semibold text-gray-300">{taskData.difficulty}/5</span></p>}
+                                                    {taskData.notes && <p className="mt-1 p-2 bg-black/30 rounded whitespace-pre-wrap font-mono text-gray-300">{taskData.notes}</p>}
                                                 </div>
                                             </div>
                                         )
@@ -448,10 +472,10 @@ const TaskItem: React.FC<{
 
                                     if (status === 'Pending') {
                                         return (
-                                            <div key={day} className="flex items-start gap-3 text-xs">
+                                            <div key={stepLabel} className="flex items-start gap-3 text-xs">
                                                 <ClockIcon className="w-4 h-4 text-brand-amber-400 flex-shrink-0 mt-0.5" />
                                                 <div>
-                                                    <p className="font-semibold text-gray-300">Day {day} Revision - Pending</p>
+                                                    <p className="font-semibold text-gray-300">{stepLabel} - Pending</p>
                                                     <p className="text-gray-400">Scheduled for {scheduledDate}</p>
                                                 </div>
                                             </div>
@@ -460,10 +484,10 @@ const TaskItem: React.FC<{
                                     
                                     if (status === 'Overdue') {
                                         return (
-                                             <div key={day} className="flex items-start gap-3 text-xs">
+                                             <div key={stepLabel} className="flex items-start gap-3 text-xs">
                                                 <AlertTriangleIcon className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
                                                 <div>
-                                                    <p className="font-semibold text-red-300">Day {day} Revision - Overdue</p>
+                                                    <p className="font-semibold text-red-300">{stepLabel} - Overdue</p>
                                                     <p className="text-gray-400">Was scheduled for {scheduledDate}</p>
                                                 </div>
                                             </div>
@@ -585,6 +609,7 @@ const EditTaskModal: React.FC<{ task: Task | null; onClose: () => void }> = ({ t
                             <option value="Lecture">Lecture</option>
                             <option value="Revision">Revision</option>
                             <option value="Practice">Practice</option>
+                            <option value="Notes">Notes</option>
                         </Select>
                     </div>
                     <div>
@@ -827,6 +852,7 @@ const Planner: React.FC<PlannerProps> = ({ activeTimer, startTimer, onCompleteTa
                                     <option value="Lecture">Lecture</option>
                                     <option value="Revision">Revision</option>
                                     <option value="Practice">Practice</option>
+                                    <option value="Notes">Notes</option>
                                     <option value="SpacedRevision">Spaced Revision</option>
                                 </Select>
                                  <Select value={filters.priority} onChange={e => setFilters(f => ({...f, priority: e.target.value as any}))}>

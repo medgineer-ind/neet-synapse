@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Link, useLocation } from 'react-router-dom';
 import Planner from './components/Planner';
@@ -11,7 +10,7 @@ import Mentor from './components/Mentor';
 import SelfTracker from './components/SelfTracker';
 import Insights from './components/Insights';
 import { ClipboardListIcon, LayoutDashboardIcon, SettingsIcon, FileTextIcon, CalendarClockIcon, PlayIcon, PauseIcon, StopCircleIcon, MegaphoneIcon, XIcon, BrainCircuitIcon, ActivityIcon, HistoryIcon, AlertTriangleIcon, MaximizeIcon, MinimizeIcon, CoffeeIcon, UtensilsIcon, DumbbellIcon, PaintBrushIcon, BedIcon, PlusIcon, BarChartIcon, WrenchIcon } from './components/ui/Icons';
-import { Task, ActiveTimer, StudySession, TestPlan, TopicPracticeAttempt, RevisionAttempt, ActiveBreak, BreakType, BreakSession } from './types';
+import { Task, ActiveTimer, StudySession, TestPlan, TopicPracticeAttempt, RevisionAttempt, ActiveBreak, BreakType, BreakSession, TaskType } from './types';
 import LiveBackground from './components/LiveBackground';
 import useStorageUsage from './hooks/useStorageUsage';
 import { generatePerformanceSummary, formatDuration, cn, getCurrentWeekString } from './lib/utils';
@@ -941,8 +940,10 @@ const SpacedRevisionModal: React.FC<{
     onClose: () => void;
     onComplete: (revisionTask: Task, duration: number, difficulty: number, notes: string) => void;
 }> = ({ task, onClose, onComplete }) => {
-    const targetTimes: { [key: number]: number } = { 3: 15 * 60, 5: 10 * 60, 7: 5 * 60, 15: 5 * 60, 30: 5 * 60 };
-    const targetDuration = task?.revisionDay ? targetTimes[task.revisionDay] : 0;
+    // 0 = Notes, 0.1 = Rev/HW, 4 = 4th Day, 9 = 9th Day, 15 = 15th Day
+    const targetTimes: { [key: number]: number } = { 0: 60 * 60, 1: 20 * 60, 3: 45 * 60, 4: 15 * 60, 7: 30 * 60, 9: 45 * 60, 15: 30 * 60 };
+    // Default to 15 mins if not found
+    const targetDuration = (task?.revisionDay !== undefined) ? (targetTimes[task.revisionDay] || 900) : 0;
 
     const [time, setTime] = useState(0);
     const [isActive, setIsActive] = useState(true);
@@ -1045,6 +1046,7 @@ const App: React.FC = () => {
     const activeTimer = useLiveQuery(() => getMiscItem<ActiveTimer | null>('activeTimer', null), null);
     const activeBreak = useLiveQuery(() => getMiscItem<ActiveBreak | null>('activeBreak', null), null);
     const [targetScore, setTargetScore] = useState(680);
+    const [targetDate, setTargetDate] = useState('');
 
     const [timerSetup, setTimerSetup] = useState<{ task?: Task; test?: TestPlan } | null>(null);
     const [taskToComplete, setTaskToComplete] = useState<Task | null>(null);
@@ -1073,6 +1075,7 @@ const App: React.FC = () => {
 
     useEffect(() => {
         getMiscItem('targetScore', 680).then(setTargetScore);
+        getMiscItem('targetDate', '').then(setTargetDate);
     }, []);
 
     const handleSetTargetScore = (score: number) => {
@@ -1311,35 +1314,41 @@ const App: React.FC = () => {
     };
 
     const createSpacedRevisionTasks = async (originalTask: Task, sourceTaskId: string | number) => {
-        const revisionDays = [3, 5, 7, 15, 30];
+        // Standard 6-Step Workflow
+        const workflow = [
+            { offset: 0, type: 'Notes' as TaskType, namePrefix: 'Step 2: Notes' },
+            { offset: 0, type: 'Revision' as TaskType, namePrefix: 'Step 3: Rev & HW' },
+            { offset: 4, type: 'Revision' as TaskType, namePrefix: 'Step 4: 4th Day Rev' },
+            { offset: 9, type: 'Practice' as TaskType, namePrefix: 'Step 5: 9th Day Prac' },
+            { offset: 15, type: 'Practice' as TaskType, namePrefix: 'Step 6: 15th Day Prac' },
+        ];
         
+        // Check for existing tasks to avoid duplicates
         const existingRevisions = await db.tasks.where({ sourceLectureTaskId: sourceTaskId as string }).toArray();
-        const existingDays = new Set(existingRevisions.map(t => t.revisionDay));
+        const existingTypesAndDays = new Set(existingRevisions.map(t => `${t.taskType}-${t.revisionDay}`));
 
-        // FIX: Explicitly type `newRevisionTasks` as `Task[]` to prevent TypeScript
-        // from inferring `taskType` as a generic `string` instead of the specific `TaskType`.
-        const newRevisionTasks: Omit<Task, "id">[] = revisionDays
-            .filter(day => !existingDays.has(day))
-            .map(day => {
+        const newTasks: Omit<Task, "id">[] = workflow
+            .filter(step => !existingTypesAndDays.has(`${step.type}-${step.offset}`))
+            .map(step => {
                 const revisionDate = new Date();
-                revisionDate.setDate(revisionDate.getDate() + day);
+                revisionDate.setDate(revisionDate.getDate() + step.offset);
                 return {
-                    name: `Day ${day} Spaced Revision for "${originalTask.name}"`,
+                    name: `${step.namePrefix} for "${originalTask.name}"`,
                     subject: originalTask.subject,
                     chapter: originalTask.chapter,
                     microtopics: originalTask.microtopics,
-                    taskType: 'SpacedRevision',
+                    taskType: step.type,
                     date: revisionDate.toISOString().split('T')[0],
                     status: 'Pending',
-                    priority: 'High',
+                    priority: step.offset <= 1 ? 'High' : 'Medium',
                     sessions: [],
                     sourceLectureTaskId: sourceTaskId as string,
-                    revisionDay: day,
+                    revisionDay: step.offset,
                 };
             });
         
-        if (newRevisionTasks.length > 0) {
-            await db.tasks.bulkAdd(newRevisionTasks.map(t => ({...t, id: crypto.randomUUID()})));
+        if (newTasks.length > 0) {
+            await db.tasks.bulkAdd(newTasks.map(t => ({...t, id: crypto.randomUUID()})));
         }
     };
 
@@ -1370,23 +1379,20 @@ const App: React.FC = () => {
                 notes: currentNotes + newNotesEntry,
             });
 
-            // Carry over notes to the next revision task
-            if (notes.trim() && revisionTask.revisionDay) {
-                const revisionDays = [3, 5, 7, 15, 30];
-                const currentDayIndex = revisionDays.indexOf(revisionTask.revisionDay);
-                if (currentDayIndex !== -1 && currentDayIndex < revisionDays.length - 1) {
-                    const nextRevisionDay = revisionDays[currentDayIndex + 1];
-                    const nextRevisionTask = await db.tasks
-                        .where({ sourceLectureTaskId: revisionTask.sourceLectureTaskId, revisionDay: nextRevisionDay })
-                        .first();
+            // Carry over notes logic
+            if (notes.trim() && revisionTask.revisionDay !== undefined) {
+                // Find next logical step
+                const nextRevisionTask = await db.tasks
+                    .where({ sourceLectureTaskId: revisionTask.sourceLectureTaskId })
+                    .filter(t => t.revisionDay! > revisionTask.revisionDay!)
+                    .first();
 
-                    if (nextRevisionTask) {
-                        const notesHeader = `\n\n--- Notes from Day ${revisionTask.revisionDay} Revision ---\n`;
-                        const newNotes = notesHeader + notes;
-                        await db.tasks.update(nextRevisionTask.id, {
-                            notes: (nextRevisionTask.notes || '') + newNotes
-                        });
-                    }
+                if (nextRevisionTask) {
+                    const notesHeader = `\n\n--- Notes from Day ${revisionTask.revisionDay} Revision ---\n`;
+                    const newNotes = notesHeader + notes;
+                    await db.tasks.update(nextRevisionTask.id, {
+                        notes: (nextRevisionTask.notes || '') + newNotes
+                    });
                 }
             }
         });
@@ -1587,7 +1593,7 @@ const App: React.FC = () => {
                     } />
                     <Route path="/self-tracker" element={<SelfTracker tasks={tasks} testPlans={testPlans} />} />
                     <Route path="/insights" element={<Insights tasks={tasks} testPlans={testPlans} targetScore={targetScore} />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/dashboard" element={<Dashboard targetDate={targetDate} />} />
                     <Route path="/settings" element={<Settings />} />
                 </Routes>
             </main>
