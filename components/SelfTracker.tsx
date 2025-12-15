@@ -1,5 +1,4 @@
 
-
 import React, { useMemo } from 'react';
 import { Task, TestPlan, SubjectName, ProgressStats, ChapterStats, SubjectStats, MicrotopicStats, StudySession } from '../types';
 import { Card } from './ui/StyledComponents';
@@ -347,7 +346,7 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
         const todaysRevisions = tasks.filter(t => t.taskType === 'SpacedRevision' && t.date === todayStr);
         const allTodaysRevisionsCompleted = todaysRevisions.length > 0 && todaysRevisions.every(t => t.status === 'Completed');
 
-        const revisionDays = tasks.reduce((acc, task) => {
+        const revisionDays = tasks.reduce((acc: Record<string, { total: number; completed: number }>, task) => {
             if (task.taskType === 'SpacedRevision') {
                 if (!acc[task.date]) {
                     acc[task.date] = { total: 0, completed: 0 };
@@ -358,9 +357,9 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
                 }
             }
             return acc;
-        }, {} as Record<string, { total: number; completed: number }>);
+        }, {});
 
-        const perfectRevisionDays = Object.keys(revisionDays)
+        const perfectRevisionDays: string[] = Object.keys(revisionDays)
             .filter(dateStr => revisionDays[dateStr].total > 0 && revisionDays[dateStr].total === revisionDays[dateStr].completed)
             .sort();
         
@@ -369,15 +368,18 @@ const SelfTracker: React.FC<SelfTrackerProps> = ({ tasks, testPlans }) => {
             const today = new Date();
             const yesterday = new Date();
             yesterday.setDate(today.getDate() - 1);
+            const todayStr = today.toISOString().split('T')[0];
             const yesterdayStr = yesterday.toISOString().split('T')[0];
 
             if (perfectRevisionDays.includes(todayStr) || perfectRevisionDays.includes(yesterdayStr)) {
                 revisionStreak = 1;
                 for (let i = perfectRevisionDays.length - 1; i > 0; i--) {
-                    // FIX: Cast array element to string to satisfy new Date() constructor overload.
-                    const current = new Date(String(perfectRevisionDays[i]));
-                    // FIX: Cast array element to string to satisfy new Date() constructor overload.
-                    const prev = new Date(String(perfectRevisionDays[i - 1]));
+                    const currentDate = perfectRevisionDays[i];
+                    const prevDate = perfectRevisionDays[i - 1];
+                    if (!currentDate || !prevDate) break;
+
+                    const current = new Date(currentDate as string);
+                    const prev = new Date(prevDate as string);
                     if ((current.getTime() - prev.getTime()) / (1000 * 3600 * 24) === 1) {
                         revisionStreak++;
                     } else {

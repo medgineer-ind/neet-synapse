@@ -20,7 +20,7 @@ function getWeekDateRange(weekString: string) {
         const now = new Date();
         return { startDate: now, endDate: now, weekNumber: 0, year: now.getFullYear() };
     }
-    const [year, week] = weekString.split('-W').map(Number);
+    const [year, week] = weekString.split('-W').map(Number) as [number, number];
     
     // Jan 4th is always in week 1
     const jan4 = new Date(Date.UTC(year, 0, 4));
@@ -78,7 +78,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ week, allTasks, allTestPlan
             return acc;
         }, {} as Record<string, number>);
 
-        const mostStudiedChapters = Object.entries(chapterSummary).sort((a, b) => b[1] - a[1]).slice(0, 3);
+        const mostStudiedChapters = Object.entries(chapterSummary).sort((a: [string, number], b: [string, number]) => b[1] - a[1]).slice(0, 3);
         
         return {
             weekTitle: `Week ${weekNumber}, ${year}`,

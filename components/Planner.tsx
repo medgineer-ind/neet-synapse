@@ -415,7 +415,7 @@ const TaskItem: React.FC<{
                     
                     {task.taskType === 'Lecture' && workflowSteps.length > 0 && (
                         <div className="pt-3 mt-3 border-t border-white/10">
-                            <strong className="text-gray-400 font-display">Post-Lecture Progress:</strong>
+                            <strong className="text-gray-400 font-display">Related Subtasks & Schedule:</strong>
                             <div className="space-y-3 mt-2 pl-2">
                                 {workflowSteps.map(stepTask => {
                                     const isCompleted = stepTask.status === 'Completed';

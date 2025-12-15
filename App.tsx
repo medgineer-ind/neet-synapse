@@ -842,16 +842,26 @@ const ConfirmSessionModal: React.FC<{
 
 const SimpleCompletionModal: React.FC<{
     task: Task | null;
-    onConfirm: () => void;
+    onConfirm: (note?: string) => void;
     onClose: () => void;
 }> = ({ task, onConfirm, onClose }) => {
+    const [note, setNote] = useState('');
+
+    useEffect(() => {
+        setNote('');
+    }, [task]);
+
     if (!task) return null;
     return (
         <Modal isOpen={!!task} onClose={onClose} title={`Complete Task: ${task.name}`}>
             <p className="mb-4">Mark this task as completed?</p>
+            <div className="mb-4">
+                <label className="block text-sm font-medium mb-1 font-display">Notes (Optional)</label>
+                <Textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Add a note..." rows={2} />
+            </div>
             <div className="flex justify-end gap-2">
                 <Button variant="secondary" onClick={onClose}>Cancel</Button>
-                <Button onClick={onConfirm}>Complete</Button>
+                <Button onClick={() => onConfirm(note)}>Complete</Button>
             </div>
         </Modal>
     )
@@ -860,20 +870,22 @@ const SimpleCompletionModal: React.FC<{
 const CompleteLectureModal: React.FC<{ 
     task: Task | null; 
     initialDuration: number;
-    onComplete: (difficulty: number, duration: number) => void; 
+    onComplete: (difficulty: number, duration: number, note?: string) => void; 
     onClose: () => void 
 }> = ({ task, initialDuration, onComplete, onClose }) => {
     const [difficulty, setDifficulty] = useState(3);
     const [duration, setDuration] = useState(initialDuration);
+    const [note, setNote] = useState('');
 
     useEffect(() => {
         setDuration(initialDuration);
         setDifficulty(3);
+        setNote('');
     }, [initialDuration, task]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onComplete(difficulty, duration);
+        onComplete(difficulty, duration, note);
     };
 
     return (
@@ -887,6 +899,10 @@ const CompleteLectureModal: React.FC<{
                     <span className="font-bold text-brand-amber-400 text-2xl w-8 text-center">{difficulty}</span>
                 </div>
                 <TimeEditor initialDuration={initialDuration} onDurationChange={setDuration} />
+                <div className="mt-4">
+                    <label className="block text-sm font-medium mb-1 font-display">Session Note (Optional)</label>
+                    <Textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Key takeaways or difficulties..." rows={2} />
+                </div>
                 <div className="flex justify-end gap-2 mt-6">
                     <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
                     <Button type="submit">Save</Button>
@@ -899,19 +915,21 @@ const CompleteLectureModal: React.FC<{
 const CompletePracticeModal: React.FC<{ 
     task: Task | null; 
     initialDuration: number;
-    onComplete: (total: number, correct: number, duration: number, incorrectCount: number) => void; 
+    onComplete: (total: number, correct: number, duration: number, incorrectCount: number, note?: string) => void; 
     onClose: () => void 
 }> = ({ task, initialDuration, onComplete, onClose }) => {
     const [total, setTotal] = useState('');
     const [correct, setCorrect] = useState('');
     const [duration, setDuration] = useState(initialDuration);
     const [incorrect, setIncorrect] = useState('');
+    const [note, setNote] = useState('');
     
      useEffect(() => {
         setDuration(initialDuration);
         setTotal('');
         setCorrect('');
         setIncorrect('');
+        setNote('');
     }, [initialDuration, task]);
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -921,7 +939,7 @@ const CompletePracticeModal: React.FC<{
         const incorrectNum = Number(incorrect || 0);
 
         if (totalNum > 0 && correctNum >= 0 && incorrectNum >= 0 && (correctNum + incorrectNum <= totalNum)) {
-            onComplete(totalNum, correctNum, duration, incorrectNum);
+            onComplete(totalNum, correctNum, duration, incorrectNum, note);
         } else {
             alert("Please check your numbers. Correct + Incorrect answers must not exceed the total questions attempted.");
         }
@@ -945,6 +963,10 @@ const CompletePracticeModal: React.FC<{
                     </div>
                 </div>
                 <TimeEditor initialDuration={initialDuration} onDurationChange={setDuration} />
+                <div className="mt-4">
+                    <label className="block text-sm font-medium mb-1 font-display">Session Note (Optional)</label>
+                    <Textarea value={note} onChange={e => setNote(e.target.value)} placeholder="What mistakes did you make?..." rows={2} />
+                </div>
                 <div className="flex justify-end gap-2 mt-6">
                     <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
                     <Button type="submit">Save</Button>
@@ -1264,7 +1286,7 @@ const App: React.FC = () => {
         await db.tasks.bulkAdd(newTasks.map(t => ({...t, id: crypto.randomUUID()})));
     };
 
-    const handleCompleteLecture = (difficulty: number, duration: number) => {
+    const handleCompleteLecture = (difficulty: number, duration: number, note?: string) => {
         if (!taskToComplete) return;
 
         const originalTask = taskToComplete;
@@ -1272,12 +1294,13 @@ const App: React.FC = () => {
         db.transaction('rw', db.tasks, async () => {
              if (taskToFinalize) { // New task from TestPlanner or Timer
                 const performanceSummary = generatePerformanceSummary(difficulty, undefined, undefined, duration);
+                const finalNote = (note ? `\n${note}\n` : '') + performanceSummary;
                 const { id: _, ...taskData } = taskToFinalize.task;
                 const finalTask: Omit<Task, 'id'> = {
                     ...taskData,
                     status: 'Completed',
                     difficulty,
-                    notes: (taskToFinalize.task.notes || '') + performanceSummary,
+                    notes: (taskToFinalize.task.notes || '') + finalNote,
                     sessions: [{ date: new Date().toISOString(), duration }],
                 };
                 const newTaskId = await db.tasks.add({ ...finalTask, id: crypto.randomUUID()});
@@ -1288,7 +1311,8 @@ const App: React.FC = () => {
 
             } else { // Existing task from Planner
                 const performanceSummary = generatePerformanceSummary(difficulty, undefined, undefined, duration);
-                const updatedNotes = (originalTask.notes || '') + performanceSummary;
+                const finalNote = (note ? `\n${note}\n` : '') + performanceSummary;
+                const updatedNotes = (originalTask.notes || '') + finalNote;
                 
                 await db.tasks.update(originalTask.id, {
                     status: 'Completed',
@@ -1307,20 +1331,23 @@ const App: React.FC = () => {
         setTaskToFinalize(null);
     };
 
-    const handleCompleteSimpleTask = () => {
+    const handleCompleteSimpleTask = (note?: string) => {
         if (!noteTaskToComplete) return;
+        const updatedNotes = note ? (noteTaskToComplete.notes ? noteTaskToComplete.notes + "\n" + note : note) : noteTaskToComplete.notes;
         db.tasks.update(noteTaskToComplete.id, {
             status: 'Completed',
+            notes: updatedNotes,
             sessions: [{ date: new Date().toISOString(), duration: 0 }] // Minimal duration for simple tasks
         });
         setNoteTaskToComplete(null);
     }
 
-    const handleCompletePractice = (total: number, correct: number, duration: number, incorrectCount: number) => {
+    const handleCompletePractice = (total: number, correct: number, duration: number, incorrectCount: number, note?: string) => {
         if (!taskToComplete) return;
 
         if (taskToFinalize) { // New task from TestPlanner timer
             const performanceSummary = generatePerformanceSummary(undefined, total, correct, duration, incorrectCount);
+            const finalNote = (note ? `\n${note}\n` : '') + performanceSummary;
              // FIX: Destructure 'id' out to ensure it's not part of the spread, satisfying the Omit<Task, 'id'> type.
              const { id: _, ...taskData } = taskToFinalize.task;
              const finalTask: Omit<Task, 'id'> = {
@@ -1329,7 +1356,7 @@ const App: React.FC = () => {
                 totalQuestions: total,
                 correctAnswers: correct,
                 incorrectAnswers: incorrectCount,
-                notes: (taskToFinalize.task.notes || '') + performanceSummary,
+                notes: (taskToFinalize.task.notes || '') + finalNote,
                 sessions: [{ date: new Date().toISOString(), duration: duration }],
             };
             db.tasks.add({ ...finalTask, id: crypto.randomUUID()});
@@ -1365,7 +1392,8 @@ const App: React.FC = () => {
             }
         } else { // Existing task from Planner
             const performanceSummary = generatePerformanceSummary(undefined, total, correct, duration, incorrectCount);
-            const updatedNotes = (taskToComplete.notes || '') + performanceSummary;
+            const finalNote = (note ? `\n${note}\n` : '') + performanceSummary;
+            const updatedNotes = (taskToComplete.notes || '') + finalNote;
             db.tasks.update(taskToComplete.id, {
                 status: 'Completed',
                 totalQuestions: total,

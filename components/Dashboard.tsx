@@ -1,5 +1,6 @@
+
 import React, { useMemo, useState, useEffect } from 'react';
-import { Task, ProgressStats, SubjectName, SubjectStats, AnalyzedTopic, TaskType, TestPlan, ChapterStats, MicrotopicStats, SubjectTestPerformance, Priority, StudySession, RevisionAttempt, BreakSession, DailyLog } from '../types';
+import { Task, ProgressStats, SubjectName, SubjectStats, AnalyzedTopic, TaskType, TestPlan, ChapterStats, MicrotopicStats, SubjectTestPerformance, Priority, StudySession, RevisionAttempt, BreakSession, DailyLog, TaskStatus } from '../types';
 import { calculateProgress, analyzeTopicsForSubject, formatDuration, calculateStudyTimeStats, calculateOverallScore, getScoreColorClass, getScoreBgClass, getCurrentWeekString } from '../lib/utils';
 import { cn } from '../lib/utils';
 import { ChevronDownIcon, AtomIcon, FlaskConicalIcon, LeafIcon, DnaIcon, BookOpenIcon, RepeatIcon, TargetIcon, CheckCircleIcon, TrophyIcon, ClockIcon, BrainCircuitIcon, AlertTriangleIcon, ShareIcon, CopyIcon, StickyNoteIcon } from './ui/Icons';
@@ -34,6 +35,10 @@ type HistoryItem = {
     isTestPrep?: boolean;
     questionSummary?: string;
     originalTask?: Task;
+    sourceLectureTaskId?: string; // New field for grouping
+    children?: HistoryItem[]; // Nested subtasks
+    status?: TaskStatus; // Status for subtasks
+    aggregatedTime?: number; // Total time for lecture + subtasks
 };
 
 
@@ -49,220 +54,312 @@ const MicrotopicHistoryModal: React.FC<{
         setExpandedHistoryItems(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
-    const unifiedHistory = useMemo(() => {
+    const groupedHistory = useMemo(() => {
         if (!topic) return [];
 
-        const regularTasks = tasks.filter(task =>
+        // 1. Get all completed tasks for this topic to show as main history entries
+        const relevantCompletedTasks = tasks.filter(task =>
             task.subject === topic.subject &&
             task.chapter === topic.chapter &&
             task.microtopics.includes(topic.microtopic) &&
             task.status === 'Completed' &&
-            task.taskType !== 'SpacedRevision'
+            task.taskType !== 'SpacedRevision' // Legacy handling
         );
+
+        const historyItems: HistoryItem[] = [];
+        const processedSubtaskIds = new Set<string>();
+
+        // 2. Process Lecture tasks first to establish them as parents
+        const lectureTasks = relevantCompletedTasks.filter(t => t.taskType === 'Lecture');
         
-        const regularTasksAsHistoryItems: HistoryItem[] = regularTasks.map(task => {
-            const totalDuration = (task.sessions || []).reduce((sum, s) => sum + s.duration, 0);
-            const accuracy = task.totalQuestions != null && task.correctAnswers != null && task.totalQuestions > 0 ? (task.correctAnswers / task.totalQuestions) * 100 : null;
-            return {
-                id: task.id,
-                name: task.name,
-                date: task.date,
-                displayDateStr: new Date(new Date(task.date).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString(),
-                sortDate: new Date(task.sessions?.[0]?.date || task.date),
-                type: task.taskType,
-                duration: totalDuration,
-                difficulty: task.difficulty,
-                accuracy: accuracy,
-                notes: task.notes,
-                sessions: task.sessions,
-                isTestPrep: task.notes?.includes('For upcoming test:'),
-                questionSummary: accuracy !== null ? `(${task.correctAnswers}/${task.totalQuestions})` : undefined,
-                originalTask: task.taskType === 'Lecture' ? task : undefined,
-            };
+        lectureTasks.forEach(lectureTask => {
+            // Find all linked tasks (subtasks) from the GLOBAL tasks list (pending or completed)
+            // matching the sourceLectureTaskId
+            const linkedSubtasks = tasks.filter(t => t.sourceLectureTaskId === lectureTask.id);
+            
+            // Mark these IDs so we don't add them as standalone items later if they happen to be completed
+            linkedSubtasks.forEach(t => processedSubtaskIds.add(t.id));
+
+            // Calculate aggregated stats
+            const lectureDuration = (lectureTask.sessions || []).reduce((sum, s) => sum + s.duration, 0);
+            const subtasksDuration = linkedSubtasks.reduce((sum, t) => sum + (t.sessions || []).reduce((s, sess) => s + sess.duration, 0), 0);
+            
+            // Map subtasks to HistoryItem-like structure for rendering
+            const childrenItems: HistoryItem[] = linkedSubtasks.map(sub => {
+                const subDuration = (sub.sessions || []).reduce((s, sess) => s + sess.duration, 0);
+                const subAccuracy = sub.totalQuestions != null && sub.correctAnswers != null && sub.totalQuestions > 0 
+                    ? (sub.correctAnswers / sub.totalQuestions) * 100 
+                    : null;
+
+                return {
+                    id: sub.id,
+                    name: sub.name,
+                    date: sub.date,
+                    displayDateStr: new Date(new Date(sub.date).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString(),
+                    sortDate: new Date(sub.date),
+                    type: sub.taskType,
+                    duration: subDuration,
+                    difficulty: sub.difficulty,
+                    accuracy: subAccuracy,
+                    notes: sub.notes,
+                    sessions: sub.sessions,
+                    status: sub.status,
+                    isTestPrep: sub.notes?.includes('For upcoming test:'),
+                    questionSummary: subAccuracy !== null ? `(${sub.correctAnswers}/${sub.totalQuestions})` : undefined,
+                };
+            });
+
+            // Sort children by workflow order
+            const orderMap: Record<string, number> = { 'Notes': 1, 'RevisionHW': 2, 'Revision4th': 3, 'Practice7th': 4, 'Practice9th': 5 };
+            childrenItems.sort((a, b) => (orderMap[a.type] || 99) - (orderMap[b.type] || 99));
+
+            const aggregatedTime = lectureDuration + subtasksDuration;
+
+            historyItems.push({
+                id: lectureTask.id,
+                name: lectureTask.name,
+                date: lectureTask.date,
+                displayDateStr: new Date(new Date(lectureTask.date).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString(),
+                sortDate: new Date(lectureTask.sessions?.[0]?.date || lectureTask.date),
+                type: lectureTask.taskType,
+                duration: lectureDuration, // Base duration
+                aggregatedTime: aggregatedTime, // Total workflow time
+                difficulty: lectureTask.difficulty,
+                accuracy: null,
+                notes: lectureTask.notes,
+                sessions: lectureTask.sessions,
+                children: childrenItems,
+                originalTask: lectureTask // Keep ref for legacy check
+            });
         });
 
-        const lectureTasksWithHistory = tasks.filter(task => 
-            task.taskType === 'Lecture' &&
-            task.subject === topic.subject &&
-            task.chapter === topic.chapter &&
-            task.microtopics.includes(topic.microtopic) &&
-            task.revisionHistory && task.revisionHistory.length > 0
-        );
+        // 3. Process other completed tasks that are NOT subtasks of the above lectures
+        relevantCompletedTasks.forEach(task => {
+            if (task.taskType !== 'Lecture' && !processedSubtaskIds.has(task.id)) {
+                 const duration = (task.sessions || []).reduce((sum, s) => sum + s.duration, 0);
+                 const accuracy = task.totalQuestions != null && task.correctAnswers != null && task.totalQuestions > 0 ? (task.correctAnswers / task.totalQuestions) * 100 : null;
+                 
+                 historyItems.push({
+                    id: task.id,
+                    name: task.name,
+                    date: task.date,
+                    displayDateStr: new Date(new Date(task.date).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString(),
+                    sortDate: new Date(task.sessions?.[0]?.date || task.date),
+                    type: task.taskType,
+                    duration: duration,
+                    difficulty: task.difficulty,
+                    accuracy: accuracy,
+                    notes: task.notes,
+                    sessions: task.sessions,
+                    status: task.status,
+                    questionSummary: accuracy !== null ? `(${task.correctAnswers}/${task.totalQuestions})` : undefined,
+                 });
+            }
+        });
 
-        const revisionAttemptsAsHistoryItems: HistoryItem[] = lectureTasksWithHistory.flatMap(lecture =>
-            (lecture.revisionHistory || []).map(attempt => ({
-                id: `${lecture.id}-rev-${attempt.revisionDay}`,
-                name: `Day ${attempt.revisionDay} Spaced Revision for "${lecture.name}"`,
-                date: attempt.date,
-                displayDateStr: new Date(attempt.date).toLocaleDateString(),
-                sortDate: new Date(attempt.date),
+        // 4. Handle Legacy Revisions (SpacedRevision type) if any - treat as standalone for now or attach?
+        // Let's attach legacy revisions to parents if parent exists in list
+        const legacyRevisions = tasks.filter(t => t.taskType === 'SpacedRevision' && t.subject === topic.subject && t.chapter === topic.chapter && t.microtopics.includes(topic.microtopic));
+        
+        legacyRevisions.forEach(rev => {
+             // Find parent
+             const parent = historyItems.find(h => h.id === rev.sourceLectureTaskId);
+             const duration = (rev.sessions || []).reduce((sum, s) => sum + s.duration, 0);
+             
+             const revItem: HistoryItem = {
+                id: rev.id,
+                name: rev.name,
+                date: rev.date,
+                displayDateStr: new Date(new Date(rev.date).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString(),
+                sortDate: new Date(rev.date),
                 type: 'SpacedRevision',
-                duration: attempt.duration,
-                difficulty: attempt.difficulty,
+                duration: duration,
+                difficulty: rev.difficulty,
                 accuracy: null,
-                notes: attempt.notes,
-                sessions: [{ date: attempt.date, duration: attempt.duration }],
-                isTestPrep: false,
-                questionSummary: undefined,
-            }))
-        );
+                notes: rev.notes,
+                status: rev.status,
+                sessions: rev.sessions
+             };
 
-        const allItems = [...regularTasksAsHistoryItems, ...revisionAttemptsAsHistoryItems];
-        allItems.sort((a, b) => b.sortDate.getTime() - a.sortDate.getTime());
+             if (parent) {
+                 if (!parent.children) parent.children = [];
+                 parent.children.push(revItem);
+                 if (parent.aggregatedTime !== undefined) parent.aggregatedTime += duration;
+             } else if (rev.status === 'Completed') {
+                 // Only show standalone legacy revision if completed
+                 historyItems.push(revItem);
+             }
+        });
 
-        return allItems;
+        // Sort all by date descending
+        return historyItems.sort((a, b) => b.sortDate.getTime() - a.sortDate.getTime());
+
     }, [tasks, topic]);
     
-    const calculateRevisionDetails = (lectureTask: Task) => {
+    // Legacy calculation for old revisionHistory array inside Lecture Task object (Pre-SpacedRevision TaskType)
+    const calculateLegacyRevisionDetails = (lectureTask: Task) => {
+        if (!lectureTask.revisionHistory || lectureTask.revisionHistory.length === 0) return [];
         const REVISION_SCHEDULE = [3, 5, 7, 15, 30];
-        const associatedRevisionTasks = tasks.filter(t => t.sourceLectureTaskId === lectureTask.id && t.taskType === 'SpacedRevision');
         
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
         return REVISION_SCHEDULE.map(day => {
             const completedData = lectureTask.revisionHistory?.find(rev => rev.revisionDay === day);
             if (completedData) return { day, status: 'Completed' as const, data: completedData };
-
-            const pendingTask = associatedRevisionTasks.find(revTask => revTask.revisionDay === day);
-            if (pendingTask) {
-                const taskDate = new Date(new Date(pendingTask.date).toLocaleString("en-US", { timeZone: "UTC" }));
-                return { day, status: taskDate < today ? 'Overdue' as const : 'Pending' as const, data: pendingTask };
-            }
             return null;
         }).filter(Boolean);
     };
 
     if (!isOpen || !topic) return null;
 
+    const renderHistoryItem = (item: HistoryItem, isChild = false) => {
+        const typeStyles: Record<TaskType, string> = {
+            Lecture: "bg-brand-amber-900/50 text-brand-amber-300 border-brand-amber-700",
+            Revision: "bg-green-900/50 text-green-300 border-green-700",
+            Practice: "bg-brand-orange-900/50 text-brand-orange-400 border-brand-orange-700",
+            Notes: "bg-slate-700/50 text-slate-300 border-slate-600",
+            RevisionHW: "bg-teal-900/50 text-teal-300 border-teal-700",
+            Revision4th: "bg-cyan-900/50 text-cyan-300 border-cyan-700",
+            Practice7th: "bg-violet-900/50 text-violet-300 border-violet-700",
+            Practice9th: "bg-pink-900/50 text-pink-300 border-pink-700",
+            SpacedRevision: "bg-cyan-900/50 text-cyan-300 border-cyan-700",
+        };
+
+        const isExpanded = !!expandedHistoryItems[item.id];
+        const hasChildren = item.children && item.children.length > 0;
+        const legacyRevisions = !hasChildren && item.type === 'Lecture' && item.originalTask ? calculateLegacyRevisionDetails(item.originalTask) : [];
+        const hasLegacyRevisions = legacyRevisions.length > 0;
+        
+        const showExpandButton = hasChildren || hasLegacyRevisions || item.notes || (item.sessions && item.sessions.length > 0);
+        
+        // Status checks for children
+        const isCompleted = item.status === 'Completed' || (item.type === 'Lecture'); // Root lecture is always completed in history
+        const taskDate = new Date(new Date(item.date).toLocaleString("en-US", { timeZone: "UTC" }));
+        const isOverdue = !isCompleted && taskDate < new Date(new Date().setHours(0,0,0,0));
+
+        return (
+            <div key={item.id} className={cn(
+                "p-3 rounded-lg border-l-4 transition-all",
+                item.isTestPrep 
+                    ? "bg-yellow-900/20 border-yellow-500" 
+                    : item.type === 'SpacedRevision'
+                    ? "bg-cyan-900/20 border-cyan-500"
+                    : isChild 
+                    ? "bg-slate-800/30 border-l-2 border-slate-600 ml-4 mt-2" 
+                    : "bg-slate-800/50 border-brand-amber-700"
+            )}>
+                <div className="flex justify-between items-start" onClick={() => showExpandButton && toggleExpand(item.id)}>
+                    <div className={cn("flex-1 cursor-pointer", !showExpandButton && "cursor-default")}>
+                        <div className="flex items-center gap-2">
+                            {isChild && (
+                                isCompleted ? <CheckCircleIcon className="w-4 h-4 text-green-400" /> : 
+                                isOverdue ? <AlertTriangleIcon className="w-4 h-4 text-red-400" /> : 
+                                <ClockIcon className="w-4 h-4 text-gray-500" />
+                            )}
+                            <span className={cn("px-2 py-0.5 text-[10px] font-bold rounded-full border uppercase tracking-wider", typeStyles[item.type])}>
+                                {item.type === 'SpacedRevision' ? 'Spaced Rev.' : item.type}
+                            </span>
+                            <p className={cn("font-semibold", isChild ? "text-sm" : "")}>
+                                {item.name.replace(/^.*: /, '')} 
+                                {/* Removes prefix like "Notes: " for clean subtask display if desired, or keep full name */}
+                            </p>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1 ml-1">
+                            {item.displayDateStr} {isChild && !isCompleted && isOverdue ? <span className="text-red-400 font-bold ml-1">(Overdue)</span> : null}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {item.aggregatedTime !== undefined && !isChild && (
+                             <span className="text-xs font-bold text-brand-amber-300 bg-brand-amber-900/40 px-2 py-1 rounded border border-brand-amber-700/50">
+                                Total: {formatDuration(item.aggregatedTime)}
+                            </span>
+                        )}
+                        {showExpandButton && (
+                            <button onClick={(e) => { e.stopPropagation(); toggleExpand(item.id); }} className="p-1 rounded-full hover:bg-white/10 text-gray-400" aria-label="Show details">
+                                <ChevronDownIcon className={cn("w-5 h-5 transition-transform", isExpanded && "rotate-180")} />
+                            </button>
+                        )}
+                    </div>
+                </div>
+                
+                {/* Stats Row */}
+                {(item.duration > 0 || item.difficulty !== undefined || item.accuracy !== null) && (
+                    <div className="mt-2 text-xs grid grid-cols-2 md:grid-cols-3 gap-2 text-gray-300 pl-1">
+                        {item.duration > 0 && <div><ClockIcon className="w-3 h-3 inline mr-1"/>Time: <span className="font-bold">{formatDuration(item.duration)}</span></div>}
+                        {item.difficulty !== undefined && <div>Difficulty: <span className="font-bold">{item.difficulty}/5</span></div>}
+                        {item.accuracy !== null && <div>Accuracy: <span className="font-bold">{item.accuracy?.toFixed(0)}%</span> {item.questionSummary}</div>}
+                    </div>
+                )}
+
+                {isExpanded && (
+                    <div className="animate-fadeIn mt-3 space-y-3">
+                        {(item.sessions || []).length > 0 && (
+                            <div className="text-xs bg-black/20 p-2 rounded">
+                                <strong className="text-gray-400 block mb-1">Sessions:</strong>
+                                <ul className="space-y-1">
+                                    {item.sessions?.map((session, index) => (
+                                        <li key={index} className="flex justify-between">
+                                            <span>Session {index + 1} ({new Date(session.date).toLocaleDateString()})</span>
+                                            <strong>{formatDuration(session.duration)}</strong>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                        
+                        {item.notes && (
+                            <div className="text-xs bg-black/20 p-2 rounded">
+                                <strong className="text-gray-400 block mb-1">Notes:</strong>
+                                <p className="whitespace-pre-wrap font-mono text-gray-300">{item.notes}</p>
+                            </div>
+                        )}
+
+                        {/* Render Nested Children (Subtasks) */}
+                        {hasChildren && (
+                            <div className="pt-2 border-t border-white/10">
+                                <strong className="text-gray-400 text-xs uppercase tracking-wider block mb-2">Workflow & Related Tasks</strong>
+                                <div className="space-y-2">
+                                    {item.children!.map(child => renderHistoryItem(child, true))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Legacy Revisions Rendering */}
+                        {hasLegacyRevisions && (
+                            <div className="pt-2 border-t border-white/10">
+                                <strong className="text-gray-400 font-display text-xs">Legacy Revision Data:</strong>
+                                <div className="space-y-2 mt-2">
+                                    {legacyRevisions.map(rev => {
+                                        if (!rev) return null;
+                                        const { day, status, data } = rev;
+                                        if (status === 'Completed') {
+                                            const details = data as RevisionAttempt;
+                                            return (
+                                                <div key={day} className="flex items-start gap-3 text-xs bg-slate-800/30 p-2 rounded border-l-2 border-green-600">
+                                                    <CheckCircleIcon className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+                                                    <div>
+                                                        <p className="font-semibold text-gray-200">Day {day} Revision</p>
+                                                        <p className="text-gray-400">Diff: {details.difficulty}/5 | Time: {formatDuration(details.duration)}</p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={`History for: ${topic.microtopic}`} maxWidth="max-w-3xl">
             <div className="max-h-[70vh] overflow-y-auto space-y-3 pr-2">
-                {unifiedHistory.length > 0 ? (
-                    unifiedHistory.map(item => {
-                        const typeStyles: Record<TaskType, string> = {
-                           Lecture: "bg-brand-amber-900/50 text-brand-amber-300 border-brand-amber-700",
-                           Revision: "bg-green-900/50 text-green-300 border-green-700",
-                           Practice: "bg-brand-orange-900/50 text-brand-orange-400 border-brand-orange-700",
-                           Notes: "bg-slate-700/50 text-slate-300 border-slate-600",
-                           RevisionHW: "bg-teal-900/50 text-teal-300 border-teal-700",
-                           Revision4th: "bg-cyan-900/50 text-cyan-300 border-cyan-700",
-                           Practice7th: "bg-violet-900/50 text-violet-300 border-violet-700",
-                           Practice9th: "bg-pink-900/50 text-pink-300 border-pink-700",
-                           SpacedRevision: "bg-cyan-900/50 text-cyan-300 border-cyan-700",
-                        };
-                        
-                        const revisionDetails = item.type === 'Lecture' && item.originalTask ? calculateRevisionDetails(item.originalTask) : [];
-                        const isExpanded = !!expandedHistoryItems[item.id];
-
-                        return (
-                            <div key={item.id} className={cn(
-                                "p-3 rounded-lg border-l-4",
-                                item.isTestPrep 
-                                    ? "bg-yellow-900/20 border-yellow-500" 
-                                    : item.type === 'SpacedRevision'
-                                    ? "bg-cyan-900/20 border-cyan-500"
-                                    : "bg-slate-800/50 border-brand-amber-700"
-                            )}>
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="font-semibold">{item.name}</p>
-                                        <p className="text-xs text-gray-400">{item.displayDateStr}</p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className={cn("px-2 py-1 text-xs font-medium rounded-full border", typeStyles[item.type])}>
-                                            {item.type === 'SpacedRevision' ? 'Spaced Rev.' : item.type}
-                                        </span>
-                                        {revisionDetails.length > 0 && (
-                                            <button onClick={() => toggleExpand(item.id)} className="p-1 rounded-full hover:bg-white/10" aria-label="Show details">
-                                                <ChevronDownIcon className={cn("w-5 h-5 transition-transform", isExpanded && "rotate-180")} />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="mt-2 text-xs grid grid-cols-2 md:grid-cols-3 gap-2 text-gray-300">
-                                    {item.duration > 0 && <div><ClockIcon className="w-3 h-3 inline mr-1"/>Time: <span className="font-bold">{formatDuration(item.duration)}</span></div>}
-                                    {item.difficulty !== undefined && <div>Difficulty: <span className="font-bold">{item.difficulty}/5</span></div>}
-                                    {item.accuracy !== null && <div>Accuracy: <span className="font-bold">{item.accuracy?.toFixed(0)}%</span> {item.questionSummary}</div>}
-                                </div>
-                                {(item.sessions || []).length > 0 && (
-                                    <details className="mt-2 text-xs">
-                                        <summary className="cursor-pointer text-gray-400 hover:text-white font-display">View Sessions ({item.sessions?.length})</summary>
-                                        <ul className="mt-1 p-2 bg-black/30 rounded space-y-1">
-                                            {item.sessions?.map((session, index) => (
-                                                <li key={index} className="flex justify-between">
-                                                    <span>Session {index + 1} ({new Date(session.date).toLocaleDateString()})</span>
-                                                    <strong>{formatDuration(session.duration)}</strong>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </details>
-                                )}
-                                {item.notes && (
-                                    <details className="mt-2 text-xs">
-                                        <summary className="cursor-pointer text-gray-400 hover:text-white font-display">View Notes</summary>
-                                        <p className="mt-1 p-2 bg-black/30 rounded whitespace-pre-wrap font-mono text-gray-400">{item.notes}</p>
-                                    </details>
-                                )}
-
-                                {isExpanded && revisionDetails.length > 0 && (
-                                    <div className="pt-3 mt-3 border-t border-white/10 animate-fadeIn">
-                                        <strong className="text-gray-300 font-display">Spaced Revision Progress:</strong>
-                                        <div className="space-y-3 mt-2 pl-2">
-                                            {revisionDetails.map(rev => {
-                                                if (!rev) return null;
-                                                const { day, status, data } = rev;
-                                                
-                                                if (status === 'Completed') {
-                                                    const details = data as RevisionAttempt;
-                                                    return (
-                                                        <div key={day} className="flex items-start gap-3 text-xs">
-                                                            <CheckCircleIcon className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                                                            <div>
-                                                                <p className="font-semibold text-gray-200">Day {day} Revision - Completed <span className="text-gray-400 font-normal">on {new Date(details.date).toLocaleDateString()}</span></p>
-                                                                <p className="text-gray-400">Difficulty: <span className="font-semibold text-gray-300">{details.difficulty}/5</span> | Duration: <span className="font-semibold text-gray-300">{formatDuration(details.duration)}</span></p>
-                                                                {details.notes && <p className="mt-1 p-2 bg-black/30 rounded whitespace-pre-wrap font-mono text-gray-300">{details.notes}</p>}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                }
-                                                
-                                                const taskData = data as Task;
-                                                const scheduledDate = new Date(new Date(taskData.date).toLocaleString("en-US", { timeZone: "UTC" })).toLocaleDateString();
-
-                                                if (status === 'Pending') {
-                                                    return (
-                                                        <div key={day} className="flex items-start gap-3 text-xs">
-                                                            <ClockIcon className="w-4 h-4 text-brand-amber-400 flex-shrink-0 mt-0.5" />
-                                                            <div>
-                                                                <p className="font-semibold text-gray-300">Day {day} Revision - Pending</p>
-                                                                <p className="text-gray-400">Scheduled for {scheduledDate}</p>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                }
-                                                
-                                                if (status === 'Overdue') {
-                                                    return (
-                                                         <div key={day} className="flex items-start gap-3 text-xs">
-                                                            <AlertTriangleIcon className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-                                                            <div>
-                                                                <p className="font-semibold text-red-300">Day {day} Revision - Overdue</p>
-                                                                <p className="text-gray-400">Was scheduled for {scheduledDate}</p>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                }
-                                                return null;
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })
+                {groupedHistory.length > 0 ? (
+                    groupedHistory.map(item => renderHistoryItem(item))
                 ) : (
-                    <p className="text-center text-gray-400 py-8">No completed task history found for this microtopic.</p>
+                    <p className="text-center text-gray-400 py-8">No completed lecture history found for this microtopic.</p>
                 )}
             </div>
         </Modal>
